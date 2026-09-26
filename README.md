@@ -1,12 +1,22 @@
 # Geo Battle
 
+[![CI](https://github.com/MarianBecher/geo-battler/actions/workflows/ci.yml/badge.svg)](https://github.com/MarianBecher/geo-battler/actions/workflows/ci.yml)
+
 A GeoGuessr-style party game for your own network: one local server,
 everyone joins with a room code, and the rounds run in real time over
 WebSockets. Styled as a passport, complete with entry stamps, a small
 sampled orchestra and the national anthem of the country you just guessed.
+English and German out of the box.
 
-English and German out of the box; the language switch sits inside the
-passport cover.
+```bash
+pnpm install
+cp .env.example .env    # add your Google Maps keys, see Setup
+pnpm dev                # http://localhost:5173
+```
+
+Needs Node 22+, [pnpm](https://pnpm.io/) and two Google Maps API keys.
+Realistically it costs nothing: the free allowance covers a couple of
+hundred games a month (see [What it costs](#what-it-costs)).
 
 ![The closed passport on the home screen](docs/passport.png)
 
@@ -19,47 +29,37 @@ passport cover.
 
 ![The personal stats with a printed world map of all targets](docs/profile.png)
 
-* **Lobby with a code** - whoever has the four-letter code is in
-* **The host picks the mode** - number of rounds and time limit; the lobby
-  votes on No Move / No Pan / No Zoom, and the host can lock them
-* **Destination** - World, Europe, DACH, Americas, Asia, Africa or Oceania;
-  everyone picks one, the most chosen wins, the host can lock it. Hall of
-  Fame records and averages only count on the world
-* **Duel** - instead of collecting points, everyone starts with hit points and
-  loses the gap to the best guess every round; at 0 you are out, the last one
-  standing wins
-* **Team duel** - Red against Blue with a shared HP bar; the team's average
-  counts, and everyone picks their own team in the lobby
-* **Countdown** - 3-2-1 before every round, everyone starts at the same time
-* **Everyone sees the same panorama** - the server finds the place and hands
-  out the panorama id
-* **A round ends** when everyone has submitted or time runs out; then the
-  reveal shows all pins on one map and the host moves on
-* **Auto-guess** - when time runs out, the last pin placed counts, submitted or not
-* **Submitting is not final** - while the round runs, the pin can be moved
-  and submitted again
-* **GeoGuessr scoring** - `5000 * e^(-10 * d / 14916.862)`, max. 5,000 per
-  round, counted up in the reveal rather than just displayed
-* **Where was that?** - the reveal names the place, not only the coordinates
-* **Music and sound** - a small orchestra: a travel waltz in the lobby, quiet
-  strings while guessing, pizzicato ticking in the last ten seconds, a timpani
-  roll and a stamp for the reveal, then the country's anthem; three levels,
-  and the setting sticks
+## Features
+
+* **Lobby with a code** - whoever has the four-letter code is in; the host
+  shares a ready-made link with the code in it
+* **The lobby decides** - the host sets rounds and time limit; everyone votes
+  on No Move / No Pan / No Zoom and picks the map (World, Europe, DACH,
+  Americas, Asia, Africa, Oceania); the host can lock any of it
+* **Classic, Duel, Team duel** - points over fixed rounds, or hit points
+  until one player or one team is left standing
+* **Everyone sees the same panorama** and starts on the same 3-2-1 countdown
+* **A round ends** when everyone has submitted or time runs out. Until then
+  the pin can be moved and submitted again; on timeout the last pin counts
+* **The reveal** shows all pins on one map, names the place, and counts the
+  GeoGuessr score up: `5000 * e^(-10 * d / 14916.862)`, max. 5,000 per round
+* **Music and sound** - a travel waltz in the lobby, quiet strings while
+  guessing, pizzicato ticking in the last ten seconds, a timpani roll and a
+  stamp for the reveal, then the country's anthem
 * **Keyboard shortcuts** - space submits, `M` keeps the map open, `R` takes
   you back to the starting point
 * **Final standings with a world map** - all targets and all guesses at a
   glance, filterable by round, plus a title per player and a statistics table
-* **Passport photos** - everyone gets a pencil-drawn face, seeded from the
-  name; in the lobby it can be rerolled and stays saved in the browser
-* **Chat** - a panel in the lobby, a window bottom left in the reveal and on
-  the final screen; closed during the round
-* **Hall of Fame** - records across evenings, the only thing that survives a
-  server restart, with personal stats per player
-* **Survives a reload** - reconnecting brings you back into the running round,
-  pin included
-* **Host tools** - kick, hand over the host role, pause the round
-* **Spectators** - whoever joins mid-game watches first: panorama, timer and
-  everyone's pins with names on their own map, plus the chat
+* **Passport photos** - a pencil-drawn face for everyone, seeded from the
+  name, rerollable in the lobby
+* **Chat** - in the lobby, the reveal and on the final screen; closed during
+  the round
+* **Hall of Fame** - records across evenings with personal stats per player,
+  the only thing that survives a server restart
+* **Survives a reload** - reconnecting brings you back into the running
+  round, pin included
+* **Host tools and spectators** - kick, hand over the host role, pause;
+  whoever joins mid-game watches the round, pins and chat first
 
 ## Setup
 
@@ -95,11 +95,10 @@ This one goes out to the players and sits in the page source.
 * **API restriction:** *Maps JavaScript API* only
 
 `None` sounds wrong but is the right choice here: a *Websites* restriction
-would have to point at the address the game is played on, and that changes
-with every network (`192.168.0.x` at home, `10.x` at work). You would be back
-in the Cloud Console at every change of location. The restriction is also the
-softest of the screws: only browsers send an honest `Referer`, and a
-`localhost` entry voids it completely.
+would have to name the address the game is played on, and that changes with
+every network (`192.168.0.x` at home, `10.x` at work). It is also the softest
+of the screws: only browsers send an honest `Referer`, and a `localhost`
+entry voids it completely.
 
 A key in client code is **not** a secret. What carries the weight are the
 other three:
@@ -166,48 +165,9 @@ pnpm start          # serves the built client on port 3000
 One player creates the lobby, the others type in the code. A `?code=ABCD`
 in the URL prefills the field.
 
-### Under WSL2: the printed IP is not enough
-
-WSL2 sits behind NAT by default (`172.x.x.x`). That IP is **not** reachable
-from other devices on the Wi-Fi. Two ways out:
-
-**a) Mirrored networking** (Windows 11 22H2+). In `C:\Users\<you>\.wslconfig`:
-
-```ini
-[wsl2]
-networkingMode=mirrored
-
-[experimental]
-hostAddressLoopback=true
-```
-
-Then `wsl --shutdown` and start again. Two more things are needed:
-
-* **`hostAddressLoopback=true`** - without it *Windows itself* only reaches
-  the server under `localhost`.
-* **The Hyper-V firewall** defaults to `DefaultInboundAction: Block` for
-  WSL. In PowerShell **as admin**, once:
-
-  ```powershell
-  New-NetFirewallHyperVRule -Name "GeoBattle-3000" `
-    -DisplayName "Geo Battle (WSL, port 3000)" -Direction Inbound `
-    -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' `
-    -Protocol TCP -LocalPorts 3000 -Action Allow
-  New-NetFirewallRule -DisplayName "Geo Battle (port 3000)" -Direction Inbound `
-    -LocalPort 3000 -Protocol TCP -Action Allow
-  ```
-
-**b) Port proxy** (older Windows). In PowerShell **as admin**:
-
-```powershell
-netsh interface portproxy add v4tov4 listenport=3000 listenaddress=0.0.0.0 `
-  connectport=3000 connectaddress=<WSL-IP>
-New-NetFirewallRule -DisplayName "Geo Battle" -Direction Inbound `
-  -LocalPort 3000 -Protocol TCP -Action Allow
-```
-
-The WSL IP changes on every restart, so the rule has to be updated. In both
-cases the IP for the other players is the **Windows** LAN IP from `ipconfig`.
+> **Under WSL2** the printed `172.x` address sits behind NAT and is not
+> reachable from other devices. [docs/wsl2.md](docs/wsl2.md) has the two ways
+> out: mirrored networking or a port proxy.
 
 ## How the others find you
 
@@ -282,8 +242,8 @@ The whole lobby votes on the three restrictions with *For* and *Against*;
 the majority of votes cast wins, on a tie the current setting stays. The
 host can *Lock* a restriction, which turns the vote into an on/off switch for
 the host alone. No Pan only works with No Move, so a vote for No Pan votes
-for No Move too. The map pack is a choice: everyone picks one, the most
-chosen applies, without votes the world does.
+for No Move too. The map is a choice: everyone picks one, the most chosen
+applies, without votes the world does.
 
 ### Duel
 
@@ -350,10 +310,11 @@ the press of a button. Not linked anywhere, open it directly.
 After every finished game the server writes the records to `data/hall.json`
 (elsewhere via `HALL_FILE`): best guess of all time, best round, best game,
 and per player games, wins, average, perfect hits and the favourite title.
-A click on a name opens the personal stats: a printed world map of all
-targets, strengths by continent and country, and the form over the last 30
-games. Players are recognised by name (lower-cased). Writes go through a
-temporary file and `rename`.
+Records and averages only count on the world map - on a small pack every
+guess is closer. A click on a name opens the personal stats: a printed world
+map of all targets, strengths by continent and country, and the form over
+the last 30 games. Players are recognised by name (lower-cased). Writes go
+through a temporary file and `rename`.
 
 ```bash
 pnpm --filter @geo-battler/server hall:clear   # or simply delete data/hall.json
@@ -416,8 +377,8 @@ A `Makefile` wraps the same commands: `make install`, `make dev`,
 `make help` lists them all.
 
 The server tests play whole games against an injected location finder; the
-client tests cover the pure parts (formatting, projections, scores). Every
-push runs the same checks on GitHub Actions.
+client tests cover the pure parts (formatting, projections, scores). Pushes
+to `main` and pull requests run the same checks on GitHub Actions.
 
 ### Docker
 
@@ -437,16 +398,12 @@ panorama, so nobody lands on an isolated photo sphere.
 
 ### WebSocket protocol
 
-Typed in `packages/shared/src/protocol.ts`. Client -> server: `create`,
-`join`, `settings`, `start`, `pin`, `guess`, `telemetry`, `ready`, `vote`,
-`team`, `color`, `face`, `chat`, `next`, `lobby`, `kick`, `host`, `pause`,
-`resume`, `leave`, `ping`. Server -> client: `hello`, `room`, `round`
-(**without** the answer), `pins`, `reveal`, `final`, `chatLog`, `chat`,
-`error`, `pong`.
-
-The coordinates of the place leave the server only with `reveal`. Whoever
-fishes the panorama id out of the dev tools can still cheat - against
-friends at the same table this is enough.
+Typed in `packages/shared/src/protocol.ts`: every message the client sends
+(`create`, `join`, `pin`, `guess`, `vote`, `chat`, ...) and every answer from
+the server (`room`, `round`, `pins`, `reveal`, `final`, ...). `round` carries
+the panorama id but not the answer; the coordinates of the place leave the
+server only with `reveal`. Whoever fishes the panorama id out of the dev
+tools can still cheat - against friends at the same table this is enough.
 
 ## Limits
 
