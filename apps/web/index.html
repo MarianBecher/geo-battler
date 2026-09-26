@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Geo Battle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Karla:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Every visible string carries a data-i18n key; the i18n module fills them
+     in at load time (translateDom). Text the script renders itself comes
+     from t() in the screens. -->
+
+<!-- ========================= Home ========================= -->
+<section class="screen active" id="screen-home">
+  <!-- The passport lies closed on the table. Opened, the inside of the cover
+       is on the left, the data page with name and photo on the right. The
+       cover is its own leaf that swings to the left when opening; on a phone
+       the two pages stack. -->
+  <div class="passport" id="passport">
+    <div class="pp-page pp-inner" id="pp-inner">
+      <svg class="pp-emblem" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="3">
+          <circle cx="60" cy="60" r="44"/>
+          <ellipse cx="60" cy="60" rx="20" ry="44"/>
+          <path d="M60 16v88M16 60h88"/>
+        </g>
+      </svg>
+      <div class="pp-notes">
+        <p class="pp-kicker" data-i18n="home.kicker">Notes for travellers</p>
+        <p class="pp-claim" data-i18n-html="home.claim">Guess Street View. Against each other. On your own network.</p>
+      </div>
+      <ol class="pp-steps">
+        <li><b>01</b><span data-i18n="home.step1">Write your name on the data page</span></li>
+        <li><b>02</b><span data-i18n="home.step2">Create a lobby or join with a code</span></li>
+        <li><b>03</b><span data-i18n="home.step3">Share the link, everyone guesses</span></li>
+      </ol>
+      <button class="hall-link" id="btn-hall-home" data-i18n-html="home.hallLink">Hall of Fame &rarr;</button>
+      <!-- Language: a small row of links at the bottom of the inner cover. -->
+      <p class="lang-pick" id="lang-pick" data-i18n-aria-label="home.language"></p>
+    </div>
+
+    <!-- The data page: header, photo with fields, the MRZ at the bottom. -->
+    <div class="pp-page pp-data home-card paper" id="home-card">
+      <p class="datapage-head" aria-hidden="true"><span data-i18n-html="home.passportHead">Passport &middot; Reisepass</span><span data-i18n-html="home.passportType">Type P &middot; GEO</span></p>
+      <div class="dp-id">
+        <div class="dp-photo">
+          <span id="home-photo"></span>
+          <button class="die-btn" id="btn-home-face" type="button" data-i18n-title="home.rollFace"><svg class="die" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="5.2" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.2" fill="currentColor"/></svg><span data-i18n="home.roll">Roll</span></button>
+        </div>
+        <div class="dp-fields">
+          <label class="dp-field">
+            <span class="dp-label" data-i18n-html="home.fieldName">Name <em>/ Surname</em></span>
+            <input id="input-name" type="text" maxlength="16" data-i18n-placeholder="home.namePlaceholder" autocomplete="off">
+          </label>
+          <div class="dp-field"><span class="dp-label" data-i18n-html="home.fieldNo">Passport No. <em>/ Nr.</em></span><span class="dp-value" id="home-passno">GB&middot;&ndash;</span></div>
+          <div class="dp-field"><span class="dp-label" data-i18n-html="home.fieldIssued">Issued <em>/ Ausgestellt</em></span><span class="dp-value" id="home-issued"></span></div>
+        </div>
+      </div>
+
+      <div class="home-stamp" id="home-stamp" aria-hidden="true"><b data-i18n="home.entryStamp">Entry</b><span id="home-stamp-sub"></span></div>
+
+      <!-- Order and weighting flip via CSS as soon as an invite link brings
+           the code along (.home-card.invited). -->
+      <div class="home-actions">
+        <button class="btn btn-primary btn-block" id="btn-create" data-i18n="home.create">Create lobby</button>
+
+        <div class="divider"><span data-i18n="home.or">or</span></div>
+
+        <div class="join-block">
+          <p class="invite-note" id="invite-note" hidden data-i18n="home.inviteNote">Code from the invitation - enter your name and go.</p>
+          <div class="join-row">
+            <input id="input-code" type="text" maxlength="4" data-i18n-placeholder="home.codePlaceholder" data-i18n-aria-label="home.codeAria" autocomplete="off" spellcheck="false">
+            <button class="btn btn-ghost" id="btn-join" data-i18n="home.join">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="warn" id="home-warning" hidden></p>
+      <p class="mrz home-mrz" id="home-mrz" aria-hidden="true"></p>
+    </div>
+
+    <!-- The cover: name on top, emblem in the middle, "Passport" below -
+         like on every real passport. The emblem is a globe made of lines. -->
+    <div class="pp-cover" id="pp-cover">
+      <button class="pp-front" id="btn-open-pass" type="button" data-i18n-aria-label="home.openPassport">
+        <span class="brand">Geo Battle</span>
+        <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="60" cy="60" r="44"/>
+            <ellipse cx="60" cy="60" rx="20" ry="44"/>
+            <path d="M60 16v88M16 60h88"/>
+            <path d="M22 38h76M22 82h76" stroke-width="1.6"/>
+          </g>
+          <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 4"/>
+        </svg>
+        <span class="brand-sub" data-i18n="home.coverTitle">Passport</span>
+        <span class="pp-type" aria-hidden="true" data-i18n-html="home.coverType">Reisepass &middot; GEO</span>
+      </button>
+      <div class="pp-back" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <button class="open-hint" id="open-hint" type="button" tabindex="-1" data-i18n="home.openPassport">Open passport</button>
+
+  <!-- Before the lobby already: whoever wants to play quietly should not
+       have to enter a room first to switch the music off. -->
+  <button class="sound-btn home-sound" id="btn-sound-home" type="button" aria-pressed="true">
+    <span class="sound-icon"></span><span class="sound-label" data-i18n="sound.label">Sound</span>
+  </button>
+</section>
+
+<!-- ========================= Lobby ========================= -->
+<section class="screen" id="screen-lobby">
+  <div class="lobby-wrap">
+    <header class="lobby-head">
+      <span class="lobby-brand" data-i18n="lobby.brand">Geo Battle · Passport</span>
+      <div class="lobby-head-actions">
+        <button class="share-link" id="share-link" data-i18n-title="lobby.copyLink">
+          <span class="share-url" id="share-url">&hellip;</span>
+          <span class="share-copy" data-i18n="lobby.copyLink">Copy link</span>
+        </button>
+        <button class="btn btn-ghost btn-sm sound-btn" id="btn-sound-lobby" aria-pressed="true">
+          <span class="sound-icon"></span><span class="sound-label" data-i18n="sound.label">Sound</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-leave" data-i18n="lobby.leave">Leave</button>
+      </div>
+      <p class="hint share-note" id="share-note"></p>
+    </header>
+
+    <!-- The open passport: travellers on the left, conditions on the right.
+         On a phone the two pages stack. -->
+    <div class="lobby-grid spread paper" id="lobby-spread">
+      <div class="lobby-col page">
+      <div class="panel">
+        <h2><span data-i18n="lobby.travellers">Travellers</span> <span class="count" id="player-count">0</span></h2>
+        <ul class="player-list" id="lobby-players"></ul>
+
+        <div class="color-pick">
+          <div class="color-head">
+            <p class="color-label" id="color-label" data-i18n="lobby.yourColor">Your colour</p>
+            <button class="btn btn-ghost btn-sm" id="btn-face" type="button" data-i18n-title="home.rollFace"><svg class="die" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="5.2" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.2" fill="currentColor"/></svg><span data-i18n="lobby.newFace">New face</span></button>
+          </div>
+          <div class="swatches" id="color-swatches"></div>
+        </div>
+      </div>
+
+      <!-- In the lobby the chat is fixed here, elsewhere it floats bottom left -->
+      <div class="panel chat-slot" id="lobby-chat-slot">
+        <h2 data-i18n="chat.title">Chat</h2>
+      </div>
+
+      <!-- Machine-readable zone like at the bottom of a passport page - built
+           from room code and names, pure decoration, hidden from screen readers. -->
+      <p class="mrz" id="lobby-mrz" aria-hidden="true"></p>
+      </div>
+
+      <div class="panel page">
+        <!-- The room code as a stamp. The button only carries the code. -->
+        <div class="code-stamp stamp">
+          <span class="code-stamp-label" data-i18n="lobby.roomCode">Room code</span>
+          <button class="code-badge" id="code-badge" data-i18n-title="lobby.copyCode">----</button>
+        </div>
+
+        <h2 data-i18n="lobby.conditions">Travel conditions</h2>
+        <p class="panel-note" id="settings-note"></p>
+
+        <!-- Classic: fixed number of rounds, points count. Duel: hit points
+             instead of rounds - whoever hits zero is out, the last one wins. -->
+        <div class="mode-switch" id="mode-switch" role="radiogroup" data-i18n-aria-label="lobby.modeAria">
+          <button data-mode="classic" class="on" role="radio" aria-checked="true">
+            <strong data-i18n="mode.classic">Classic</strong><em data-i18n="mode.classicHint">Points over a fixed number of rounds</em>
+          </button>
+          <button data-mode="duel" role="radio" aria-checked="false">
+            <strong data-i18n="mode.duel">Duel</strong><em data-i18n="mode.duelHint">Lose hit points until one is left</em>
+          </button>
+        </div>
+
+        <!-- Rounds or HP and the time sit side by side - exactly one of the
+             first two is visible at any time. -->
+        <div class="settings-row">
+          <div class="setting" id="setting-rounds">
+            <label for="set-rounds" data-i18n="lobby.rounds">Rounds</label>
+            <div class="stepper">
+              <button data-step="rounds" data-delta="-1" class="btn-step" data-i18n-aria-label="lobby.fewerRounds">&minus;</button>
+              <output id="set-rounds">5</output>
+              <button data-step="rounds" data-delta="1" class="btn-step" data-i18n-aria-label="lobby.moreRounds">+</button>
+            </div>
+          </div>
+
+          <div class="setting" id="setting-hp" hidden>
+            <label for="set-hp" data-i18n="lobby.hp">Hit points</label>
+            <div class="stepper">
+              <button data-step="hp" data-delta="-1" class="btn-step" data-i18n-aria-label="lobby.fewerHp">&minus;</button>
+              <output id="set-hp">6,000</output>
+              <button data-step="hp" data-delta="1" class="btn-step" data-i18n-aria-label="lobby.moreHp">+</button>
+            </div>
+          </div>
+
+          <div class="setting">
+            <label for="set-time" data-i18n="lobby.timePerRound">Time per round</label>
+            <div class="stepper">
+              <button data-step="timeLimit" data-delta="-1" class="btn-step" data-i18n-aria-label="lobby.lessTime">&minus;</button>
+              <output id="set-time">1:30</output>
+              <button data-step="timeLimit" data-delta="1" class="btn-step" data-i18n-aria-label="lobby.moreTime">+</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint duel-hint" id="duel-hint" hidden data-i18n="lobby.duelHint">Every round you lose the gap to the best guess of the round - from round 6 with a rising factor. At 0 you are out.</p>
+
+        <!-- Duel only: two teams with a shared HP bar -->
+        <label class="toggle" id="setting-teams" hidden>
+          <input type="checkbox" data-flag="teams">
+          <span class="toggle-body">
+            <strong data-i18n="lobby.teams">Teams</strong>
+            <em data-i18n="lobby.teamsHint">Red against Blue, shared hit points, the average counts</em>
+          </span>
+        </label>
+
+        <!-- The lobby votes on the three restrictions, the majority wins.
+             The host can lock them. The vote row is filled by the lobby screen. -->
+        <div class="toggles">
+          <!-- The map pack: everyone picks one, the most chosen applies. -->
+          <div class="vote-card pack-card" data-vote-box="pack">
+            <div class="vote-head">
+              <div class="vote-text">
+                <strong data-i18n="lobby.destination">Destination</strong>
+                <em id="pack-hint" data-i18n="lobby.destinationHint">Where the places are</em>
+              </div>
+              <span class="vote-result" data-i18n="pack.world.name">World</span>
+            </div>
+            <div class="vote-body"></div>
+          </div>
+          <div class="vote-card" data-vote-box="noMove">
+            <div class="vote-head">
+              <div class="vote-text">
+                <strong>No Move</strong>
+                <em data-i18n="lobby.noMoveHint">You stay glued to the starting point</em>
+              </div>
+              <span class="vote-result" data-i18n="vote.off">Off</span>
+            </div>
+            <div class="vote-body"></div>
+          </div>
+          <div class="vote-card" data-vote-box="noPan">
+            <div class="vote-head">
+              <div class="vote-text">
+                <strong>No Pan</strong>
+                <em data-i18n="lobby.noPanHint">The view is fixed - only together with No Move</em>
+              </div>
+              <span class="vote-result" data-i18n="vote.off">Off</span>
+            </div>
+            <div class="vote-body"></div>
+          </div>
+          <div class="vote-card" data-vote-box="noZoom">
+            <div class="vote-head">
+              <div class="vote-text">
+                <strong>No Zoom</strong>
+                <em data-i18n="lobby.noZoomHint">No zooming in on that sign</em>
+              </div>
+              <span class="vote-result" data-i18n="vote.off">Off</span>
+            </div>
+            <div class="vote-body"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost btn-block btn-sm" id="btn-nmpz" data-i18n="lobby.nmpz">NMPZ - lock all three</button>
+      </div>
+    </div>
+
+    <footer class="lobby-foot">
+      <div class="lobby-foot-text">
+        <p class="error" id="lobby-error" hidden></p>
+        <p class="hint" id="start-hint" data-i18n="lobby.startHintAuto">Once everyone is ready, the game starts by itself.</p>
+      </div>
+      <button class="btn btn-ghost" id="btn-start" hidden data-i18n="lobby.startAnyway">Start anyway</button>
+      <button class="btn btn-primary btn-lg" id="btn-ready" data-i18n="ready">Ready</button>
+    </footer>
+  </div>
+</section>
+
+<!-- ========================= Loading ========================= -->
+<section class="screen" id="screen-loading">
+  <div class="loader">
+    <div class="spinner"></div>
+    <h2 data-i18n="loading.title">Looking for places</h2>
+    <p class="hint" data-i18n="loading.hint">The server rolls coordinates until Street View plays along.</p>
+  </div>
+</section>
+
+<!-- ========================= Game ========================= -->
+<section class="screen" id="screen-game">
+  <div id="pano"></div>
+  <div id="pano-lock" hidden></div>
+
+  <div class="hud">
+    <div class="hud-chip" id="hud-round">Round 1/5</div>
+    <div class="hud-chip hud-timer" id="hud-timer" hidden>1:30</div>
+    <div class="hud-chip hud-multiplier" id="hud-multiplier" hidden data-i18n-title="game.multiplierTitle">&times;1.5</div>
+    <div class="hud-modes" id="hud-modes"></div>
+    <!-- Spectators: see the round and the others' pins, do not guess. -->
+    <div class="hud-chip hud-watch" id="hud-watch" hidden data-i18n-html="game.spectator">&#9737; Spectator</div>
+    <!-- Whoever got lost comes back to the start of the round with this. -->
+    <button class="hud-chip hud-btn" id="btn-pano-home" data-i18n-title="game.returnTitle" hidden data-i18n-html="game.return">&#8635; Start</button>
+    <!-- Host only: pause the round. Resuming happens via the pause overlay. -->
+    <button class="hud-chip hud-btn" id="btn-pause" data-i18n-title="game.pauseTitle" hidden data-i18n-html="game.pause">&#10074;&#10074; Pause</button>
+    <button class="hud-chip hud-btn sound-btn" id="btn-sound" data-i18n-title="sound.toggle" aria-pressed="true">
+      <span class="sound-icon"></span>
+    </button>
+    <div class="hud-spacer"></div>
+    <ul class="hud-players" id="hud-players"></ul>
+  </div>
+
+  <div class="guess-box" id="guess-box">
+    <div class="guess-resize" id="guess-resize" data-i18n-title="game.resizeMap"></div>
+    <div class="guess-map" id="guess-map"></div>
+    <div class="guess-actions">
+      <button class="btn-icon" id="btn-pin-map" data-i18n-title="game.pinMapTitle">&#8689;</button>
+      <button class="btn btn-primary btn-block" id="btn-guess" data-i18n-title="game.submitTitle" disabled data-i18n="game.placePin">Place a pin</button>
+    </div>
+    <p class="guess-status" id="guess-status" hidden></p>
+  </div>
+
+  <!-- The host paused: timer stopped, pins refused, everyone sees it. -->
+  <div class="countdown pause" id="pause" hidden>
+    <span class="stamp stamp-red pause-stamp" data-i18n="game.paused">Paused</span>
+    <p class="countdown-round" id="pause-note"></p>
+    <button class="btn btn-primary btn-lg" id="btn-resume" hidden data-i18n="game.resume">Resume</button>
+  </div>
+
+  <!-- 3-2-1 before every round. Covers everything, the panorama loads underneath. -->
+  <div class="countdown" id="countdown" hidden>
+    <p class="countdown-round" id="countdown-round">Round 1</p>
+    <span class="countdown-num" id="countdown-num">3</span>
+  </div>
+</section>
+
+<!-- ========================= Reveal ========================= -->
+<section class="screen" id="screen-reveal">
+  <div class="reveal-layout">
+    <div class="reveal-map" id="reveal-map"></div>
+    <aside class="reveal-side paper">
+      <header>
+        <p class="reveal-round" id="reveal-round"></p>
+        <a class="place-link" id="reveal-place-link" target="_blank" rel="noopener" hidden data-i18n="reveal.onGoogleMaps">On Google Maps</a>
+      </header>
+      <!-- The entry stamp: place in large type, region, country and date below. -->
+      <div class="entry-stamp stamp" id="entry-stamp">
+        <div class="entry-stamp-inner">
+          <span class="stamp-flag" id="reveal-flag" aria-hidden="true"></span>
+          <span class="entry-stamp-label" data-i18n="home.entryStamp">Entry</span>
+          <h2 id="reveal-place"></h2>
+          <span class="entry-stamp-sub" id="reveal-place-sub"></span>
+        </div>
+      </div>
+      <ol class="result-list" id="reveal-results"></ol>
+      <footer>
+        <button class="btn btn-primary btn-block" id="btn-next" data-i18n="ready">Ready</button>
+        <button class="btn btn-ghost btn-block btn-sm" id="btn-force-next" hidden data-i18n="reveal.continueAnyway">Continue anyway</button>
+        <p class="hint" id="next-hint" data-i18n="reveal.nextHintAuto">Once everyone is ready, it continues by itself.</p>
+      </footer>
+    </aside>
+  </div>
+</section>
+
+<!-- ========================= Final ========================= -->
+<section class="screen" id="screen-final">
+  <div class="final-layout">
+    <div class="final-map-wrap" id="final-stage">
+      <div class="final-map" id="final-map"></div>
+      <!-- Street View of the selected round - picture-in-picture first, large via the swap button. -->
+      <div class="final-pano" id="final-pano"></div>
+      <button class="pip-swap" id="btn-pip-swap" data-i18n-title="final.swapViews">&#8646;</button>
+      <div class="map-tools">
+        <p class="final-place" id="final-place" hidden></p>
+        <div class="round-filter" id="round-filter"></div>
+        <button class="street-toggle" id="btn-street" hidden data-i18n="final.showStreetView">Show Street View</button>
+      </div>
+    </div>
+    <aside class="final-side paper">
+      <header>
+        <p class="final-sub" id="final-sub"></p>
+        <h1 class="final-title" id="final-title" data-i18n="final.title">Final standings</h1>
+      </header>
+      <!-- Who won is stamped into the passport -->
+      <div class="win-stamp stamp" id="final-winner" hidden>
+        <span class="win-stamp-label" id="final-winner-label"></span>
+        <span class="win-stamp-name" id="final-winner-name"></span>
+      </div>
+      <ol class="team-board" id="final-teams" hidden></ol>
+      <ol class="podium" id="final-board"></ol>
+      <footer>
+        <button class="btn btn-ghost btn-block btn-sm" id="btn-stats" hidden data-i18n="final.allStats">All statistics</button>
+        <button class="btn btn-ghost btn-block btn-sm" id="btn-hall" data-i18n="hall.title">Hall of Fame</button>
+        <button class="btn btn-primary btn-block" id="btn-again" data-i18n="final.backToLobby">Back to the lobby</button>
+        <p class="hint" id="again-hint" data-i18n="final.hostBringsBack">The host brings you back.</p>
+      </footer>
+    </aside>
+  </div>
+</section>
+
+<!-- All measured values, the best player per metric highlighted -->
+<div class="stats-overlay" id="stats-overlay" hidden>
+  <div class="stats-card paper">
+    <header>
+      <div>
+        <p class="sub" data-i18n="stats.sub">The game in numbers</p>
+        <h2 data-i18n="final.allStats">All statistics</h2>
+      </div>
+      <button class="btn-icon" id="btn-stats-close" data-i18n-title="close">&times;</button>
+    </header>
+    <div class="stats-scroll">
+      <table class="stats-table" id="stats-table"></table>
+    </div>
+    <p class="hint" data-i18n="stats.hint">The best value is highlighted - pure observations have none.</p>
+  </div>
+</div>
+
+<!-- Records across evenings - stored as JSON next to the server -->
+<div class="stats-overlay" id="hall-overlay" hidden>
+  <div class="stats-card hall-card paper">
+    <header>
+      <div>
+        <p class="sub" id="hall-sub" data-i18n="hall.sub">All games on this server</p>
+        <h2 id="hall-title" data-i18n="hall.title">Hall of Fame</h2>
+      </div>
+      <div class="hall-head-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-hall-me" data-i18n="hall.myStats">My stats</button>
+        <button class="btn btn-ghost btn-sm" id="btn-hall-back" hidden data-i18n-html="hall.allPlayers">&larr; All players</button>
+        <button class="btn-icon" id="btn-hall-close" data-i18n-title="close">&times;</button>
+      </div>
+    </header>
+
+    <div class="hall-main" id="hall-main">
+      <div class="hall-records" id="hall-records"></div>
+      <div class="stats-scroll">
+        <table class="stats-table" id="hall-table"></table>
+      </div>
+      <p class="hint" data-i18n="hall.hint">Players are recognised by name - whoever renames themselves starts over. Click a name for the personal stats.</p>
+    </div>
+
+    <!-- A player's personal stats -->
+    <div class="profile" id="hall-profile" hidden>
+      <div class="profile-dp" id="profile-tiles"></div>
+      <section class="profile-map-box">
+        <h3><span data-i18n="profile.whereTargets">Where the targets were</span> <small id="profile-map-sub"></small></h3>
+        <div class="profile-map" id="profile-map"></div>
+        <div class="profile-legend" id="profile-legend"></div>
+        <p class="profile-pick" id="profile-pick"></p>
+      </section>
+      <div class="profile-grid">
+        <section>
+          <h3 data-i18n="profile.byContinent">By continent</h3>
+          <ul class="profile-bars" id="profile-continents"></ul>
+        </section>
+        <section class="profile-countries">
+          <div><h3 data-i18n="profile.bestCountries">Strongest countries</h3><ol id="profile-best"></ol></div>
+          <div><h3 data-i18n="profile.worstCountries">Weakest countries</h3><ol id="profile-worst"></ol></div>
+        </section>
+      </div>
+      <section>
+        <h3 data-i18n="profile.form">Form - average points per game</h3>
+        <div class="profile-form" id="profile-form"></div>
+      </section>
+      <p class="hint" id="profile-note"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Chat: a panel in the lobby (moved there), a collapsible window bottom
+     left in the reveal and on the final screen. Closed during the round. -->
+<section class="chat" id="chat" hidden>
+  <button class="chat-toggle" id="chat-toggle" type="button" aria-expanded="false" aria-controls="chat-panel">
+    <span data-i18n="chat.title">Chat</span> <span class="chat-badge" id="chat-badge" hidden>0</span>
+  </button>
+  <div class="chat-panel" id="chat-panel">
+    <ol class="chat-log" id="chat-log" aria-live="polite"></ol>
+    <p class="chat-empty" id="chat-empty" data-i18n="chat.empty">No messages yet. Say something while everyone gets ready.</p>
+    <form class="chat-form" id="chat-form" autocomplete="off">
+      <input id="chat-input" type="text" maxlength="200" data-i18n-placeholder="chat.placeholder" data-i18n-aria-label="chat.message">
+      <button class="btn btn-ghost btn-sm" type="submit" data-i18n="chat.send">Send</button>
+    </form>
+  </div>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
