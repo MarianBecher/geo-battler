@@ -1,0 +1,29 @@
+{
+  "name": "@geo-battler/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The geo-battler game server: rooms, location search, scoring, Hall of Fame, served over HTTP and WebSockets.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "esbuild src/index.ts src/hall-clear.ts --bundle --platform=node --target=node22 --format=esm --external:hono --external:@hono/node-server --external:ws --sourcemap --outdir=dist",
+    "start": "node dist/index.js",
+    "hall:clear": "tsx src/hall-clear.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@geo-battler/shared": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.0"
+  }
+}
