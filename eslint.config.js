@@ -23,7 +23,16 @@ export default tseslint.config(
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/no-empty-function': 'off',
+      // `$<HTMLButtonElement>('id')` is the idiom for typed element lookups.
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
     },
   },
-  { files: ['**/*.js'], ...tseslint.configs.disableTypeChecked },
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      globals: { console: 'readonly', process: 'readonly' },
+    },
+  },
 );
