@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geo Battle · Jukebox</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Karla:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+<!-- For listening through the music without having to roll the country
+     first. Not linked anywhere - open /jukebox directly. -->
+<main class="jb">
+  <h1>Jukebox</h1>
+  <p data-i18n="jukebox.intro">Everything the game plays, for listening through. The first click unlocks audio; the samples take a few seconds to load.</p>
+  <p class="now" id="now" data-i18n="jukebox.nothingYet">Nothing played yet.</p>
+
+  <h2 data-i18n="jukebox.themes">Themes</h2>
+  <div class="row" id="moods">
+    <button data-mood="lobby" data-i18n="jukebox.theme.lobby">Lobby · travel waltz</button>
+    <button data-mood="game" data-i18n="jukebox.theme.game">Guessing · on the road</button>
+    <button data-mood="" data-i18n="jukebox.silence">Silence</button>
+  </div>
+
+  <h2 data-i18n="jukebox.effects">Effects</h2>
+  <div class="row" id="fx"></div>
+
+  <h2 data-i18n="jukebox.anthems">Arrival &amp; anthems</h2>
+  <p data-i18n="jukebox.anthemsIntro">Exactly as in the reveal: roll, stamp, transition, anthem, then the waltz.</p>
+  <div class="row" style="margin-bottom: 10px">
+    <button data-country="" data-i18n="jukebox.noAnthem">Without anthem (open sea)</button>
+  </div>
+  <div class="grid" id="anthems"><p data-i18n="jukebox.loadingList">Loading list …</p></div>
+</main>
+<script type="module" src="/src/jukebox.ts"></script>
+</body>
+</html>
