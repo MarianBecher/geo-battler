@@ -1,0 +1,35 @@
+{
+  "name": "geo-battler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A GeoGuessr-style Street View party game for your local network",
+  "license": "MIT",
+  "author": "Marian Becher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MarianBecher/geo-battler.git"
+  },
+  "packageManager": "pnpm@10.10.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @geo-battler/server --filter @geo-battler/web --parallel --stream run dev",
+    "build": "pnpm -r run build",
+    "start": "node apps/server/dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.15.0",
+    "eslint": "^9.30.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.35.0",
+    "vitest": "^3.2.0"
+  }
+}
