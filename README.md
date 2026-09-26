@@ -302,6 +302,13 @@ orchestration lives in `apps/web/src/audio/music.ts`. Anthems whose
 composition is still under copyright are not included; then, and on the open
 sea, a short cadence plays instead.
 
+Anthems you are not allowed to redistribute can still be played on your own
+machine: put them into `apps/web/anthems.local/` (same JSON format, plus an
+`index.json` listing them) and run `pnpm --filter @geo-battler/web assets`.
+They are merged into the served index, the free package version wins where
+both exist. The folder and any `restricted-*.json` are gitignored and
+dockerignored, so they never reach the repository or an image.
+
 **Jukebox:** `/jukebox` plays the themes, the effects and every anthem at
 the press of a button. Not linked anywhere, open it directly.
 

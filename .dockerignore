@@ -5,3 +5,5 @@ node_modules
 .env
 data
 apps/web/public/audio
+**/anthems.local
+**/restricted-*.json

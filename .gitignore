@@ -3,3 +3,8 @@ dist/
 .env
 data/
 *.log
+
+# Local-only anthem arrangements that are not freely licensed.
+# They must never be committed, see apps/web/scripts/copy-assets.mjs.
+anthems.local/
+restricted-*.json
