@@ -1,0 +1,18 @@
+{
+  "name": "@geo-battler/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types and constants shared by the geo-battler server and client: the WebSocket protocol, settings, scoring, title and error codes.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.0"
+  }
+}
