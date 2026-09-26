@@ -1,0 +1,2570 @@
+/* ==========================================================================
+   Geo Battle - Passport
+   The cover (navy) is the ground everything sits on. Content sits on
+   passport paper: a pale security green, deliberately not cream. Only the
+   stamps get to be loud - room code, entry, points, winner. Everything else
+   stays calm so the passport doesn't turn into a costume.
+   ========================================================================== */
+
+:root {
+  /* Cover */
+  --cover: #1c2a48;
+  --cover-deep: #15203a;
+  --cover-line: #4a5d86;
+  --cover-text: #e8efe7;
+  --cover-muted: #aab6cc;   /* 7:1 on the cover */
+  --foil: #cdb987;          /* Embossing on the start-screen cover */
+
+  /* Paper */
+  --paper: #e8efe7;
+  --paper-raise: #f4f8f3;   /* Fields and tables - a touch lighter */
+  --paper-sink: #dce5db;
+  --ink: #1f2d4d;
+  --ink-2: #55627d;         /* 5.2:1 on paper */
+  --rule: #aebdae;          /* dashed rules */
+  --rule-soft: #cfdacf;
+  --guilloche: #cfdccf;
+
+  /* Stamp colours - each one carries meaning */
+  --red: #b8323a;           /* room code, "On", the best player */
+  --green: #2e6b4f;         /* entry, "Ready" */
+  --grey-ink: #55627d;      /* the smaller stamps */
+  --marker: rgba(245, 214, 90, .42);  /* Highlighter: your own row */
+  --marker-solid: #eee4ac;  /* the same stroke, opaque, for inner rules */
+  --ink-on-marker: #3f4c68; /* secondary text on the highlighter - ink-2 would be too pale */
+  --primary: #e24b4b;       /* the one button per screen - only with large type */
+  --primary-hover: #cc3a3d;
+
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --body: Karla, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Space Mono", ui-monospace, monospace;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 18px 40px -16px rgba(5, 10, 24, .6);
+  --hud-h: 56px;
+
+  /* Page turns: cover on the start screen, data page into the lobby */
+  --turn: .9s;
+  --turn-ease: cubic-bezier(.55, .05, .25, 1);
+
+  /* Context colours: light on the cover, ink on paper (see .paper) */
+  --fg: var(--cover-text);
+  --muted: var(--cover-muted);
+  --line: var(--cover-line);
+  --focus: var(--cover-text);
+}
+
+/* Everything that sits on paper writes in ink. The list also covers the
+   paper labels over map and panorama, which carry no guilloche. */
+.paper,
+.guess-box,
+.hud-chip,
+.hud-players li,
+.map-tools,
+.pip-swap,
+.chat.floating .chat-panel {
+  --fg: var(--ink);
+  --muted: var(--ink-2);
+  --line: var(--ink);
+  --focus: var(--ink);
+  color: var(--fg);
+}
+
+/* Guilloche: two fine pairs of waves, only on the large paper surfaces. At
+   1.2:1 it is pale enough not to compete with text. */
+.paper {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='64'%3E%3Cg fill='none' stroke='%23cfdccf'%3E%3Cpath d='M0 16C53 0 107 0 160 16S267 32 320 16 427 0 480 16 587 32 640 16'/%3E%3Cpath d='M0 46C53 30 107 30 160 46S267 62 320 46 427 30 480 46 587 62 640 46'/%3E%3C/g%3E%3C/svg%3E") repeat-x 0 14%,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='64'%3E%3Cg fill='none' stroke='%23cfdccf'%3E%3Cpath d='M0 16C53 0 107 0 160 16S267 32 320 16 427 0 480 16 587 32 640 16'/%3E%3Cpath d='M0 46C53 30 107 30 160 46S267 62 320 46 427 30 480 46 587 62 640 46'/%3E%3C/g%3E%3C/svg%3E") repeat-x 0 84%,
+    var(--paper);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--cover);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 800; line-height: 1.05; }
+p { margin: 0; }
+
+/* Classes with their own display must not override [hidden]. */
+[hidden] { display: none !important; }
+
+/* Keyboard focus always visible - light on the cover, ink on paper. */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Base layout ---------- */
+
+.screen { display: none; position: fixed; inset: 0; }
+.screen.active { display: block; }
+
+.sub { font-size: 15px; color: var(--muted); }
+.hint { font-size: 14px; color: var(--muted); line-height: 1.45; }
+.error { font-size: 15px; color: #ffb4b4; }
+.paper .error { color: var(--red); }
+.warn { font-size: 14px; color: var(--red); line-height: 1.5; }
+
+/* ---------- Stamps ---------- */
+/* Border in the stamp colour, text in the display face, slightly askew.
+   multiply lets the guilloche show through - like ink on paper. */
+
+.stamp {
+  display: inline-block;
+  padding: 1px 9px;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+  transform: rotate(var(--tilt, -3deg));
+  mix-blend-mode: multiply;
+}
+.stamp-red { color: var(--red); }
+.stamp-ok { color: var(--green); }
+.stamp-grey { color: var(--grey-ink); }
+
+/* Pressed once: in from above, briefly too deep, then it settles. */
+.stamp.press { animation: stamp-press .42s cubic-bezier(.3, 1.4, .5, 1) .18s backwards; }
+@keyframes stamp-press {
+  0%   { transform: rotate(var(--tilt, -3deg)) scale(1.5); opacity: 0; }
+  55%  { transform: rotate(var(--tilt, -3deg)) scale(.96); opacity: 1; }
+  100% { transform: rotate(var(--tilt, -3deg)) scale(1); opacity: 1; }
+}
+
+/* Slide in: lobby, round results and final standings share the motion. */
+@keyframes slide-in {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+/* The big stamp: from high up, askew, with force. */
+@keyframes stamp-slam {
+  0%   { transform: rotate(calc(var(--tilt, -3deg) - 10deg)) scale(2.4); opacity: 0; }
+  60%  { transform: rotate(var(--tilt, -3deg)) scale(.93); opacity: 1; }
+  78%  { transform: rotate(var(--tilt, -3deg)) scale(1.03); }
+  100% { transform: rotate(var(--tilt, -3deg)) scale(1); opacity: 1; }
+}
+/* The page gives a little on impact. */
+@keyframes thud {
+  0%, 100% { transform: none; }
+  30% { transform: translate(1px, 3px); }
+  60% { transform: translate(-1px, -1px); }
+}
+/* Small stamp at the end of the count-up: briefly bigger, then it settles. */
+@keyframes stamp-land {
+  0%   { transform: rotate(var(--tilt, -3deg)) scale(1); }
+  35%  { transform: rotate(var(--tilt, -3deg)) scale(1.28); }
+  100% { transform: rotate(var(--tilt, -3deg)) scale(1); }
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform .08s ease, background .15s ease, border-color .15s ease, color .15s ease;
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* White on #e24b4b is 3.9:1 - only enough for large text. That's why the
+   primary button always uses the display face at 22 px bold or larger. */
+.btn-primary {
+  padding: 12px 22px;
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 23px;
+  letter-spacing: .03em;
+  line-height: 1.05;
+}
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+/* Disabled is a clear grey rather than faded red - otherwise it just looks tired. */
+.btn-primary:disabled { opacity: 1; background: #c3ccc3; color: #4f5b73; }
+.lobby-foot .btn-primary:disabled { background: #34436a; color: #a3afc6; }
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--fg);
+}
+.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+
+.btn-block { display: block; width: 100%; }
+.btn-lg { min-width: 230px; padding: 14px 30px; font-size: 27px; }
+.btn-sm { padding: 8px 14px; font-size: 14px; }
+
+.btn-step {
+  width: 40px; height: 40px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.btn-step:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.btn-step:disabled { opacity: .25; cursor: not-allowed; }
+
+.btn-icon {
+  width: 44px;
+  flex: 0 0 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font-size: 17px;
+  cursor: pointer;
+}
+.btn-icon:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.btn-icon.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+/* Submitted or ready: the button stays but turns into a green note. */
+.btn.is-done {
+  background: transparent;
+  border: 2px solid var(--green);
+  color: var(--green);
+}
+/* Must override .btn-primary:hover, or the green button turns red. */
+.btn.is-done:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 10%, transparent); color: var(--green); }
+/* Ink green would be unreadable on the cover - use a light green there. */
+.lobby-foot .btn.is-done,
+.lobby-foot .btn.is-done:hover:not(:disabled) { border-color: #8fd0ad; color: #bfe6d0; background: transparent; }
+
+/* ---------- Inputs ---------- */
+
+.field { display: block; margin-bottom: 18px; }
+.field > span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-raise);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+input[type="text"]:focus { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+input::placeholder { color: #6a768e; }
+
+/* ---------- Start: the passport ---------- */
+
+#screen-home {
+  display: none;
+  place-items: center;
+  align-content: center;
+  gap: 22px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 36px 16px 48px;
+}
+#screen-home.active { display: grid; }
+/* The table the passport lies on - darker than the cover itself. */
+#screen-home { background: radial-gradient(ellipse at 50% 35%, #1a2745 0%, #111a30 70%, #0c1324 100%); }
+
+/* The atlas under the passport and behind the lobby (backdrop.js): a canvas
+   above the screen background but below everything standing on it. isolate
+   gives the screen its own stacking context, so z-index -1 can do that. */
+#screen-home, #screen-lobby { isolation: isolate; }
+.backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+/* Two pages side by side, the cover lying on the right one. When closed the
+   whole thing shifts half a page left so the cover sits centred; on opening
+   the passport slides back while the cover swings to the left. */
+.passport {
+  --pw: min(400px, calc(50vw - 28px));
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--pw) var(--pw);
+  transform: translateX(calc(var(--pw) * -.5));
+  transition: transform var(--turn) var(--turn-ease);
+}
+.passport.open { transform: none; }
+.passport.instant, .passport.instant * { transition: none !important; }
+
+/* For the way into the lobby: pages empty, passport invisible, swung away. */
+.pp-page > * { transition: opacity .2s ease; }
+.passport.blank .pp-page > * { opacity: 0; }
+.passport.ghost { visibility: hidden; }
+.passport.away {
+  transform-origin: left center;
+  transform: perspective(1600px) rotateY(-80deg);
+  opacity: 0;
+  transition: transform .6s cubic-bezier(.5, 0, .75, 0), opacity .45s ease .15s;
+}
+
+.pp-page {
+  position: relative;
+  grid-row: 1;
+  min-width: 0;
+  box-shadow: 0 26px 50px -22px rgba(0, 0, 0, .75), 0 6px 14px -8px rgba(0, 0, 0, .45);
+}
+.pp-inner { grid-column: 1; }
+.pp-data, .pp-cover { grid-column: 2; grid-row: 1; }
+
+/* The inside page only appears once the cover is down - before that it would
+   show to the left of the closed passport. Its content then fades in. */
+.passport:not(.settled) .pp-inner { visibility: hidden; }
+.pp-inner > * { transition: opacity .35s ease; }
+.passport:not(.settled) .pp-inner > * { opacity: 0; }
+.passport.settled .pp-cover { visibility: hidden; }
+
+/* The cover: one leaf with two sides that rotates around the spine. */
+.pp-cover {
+  position: relative;
+  z-index: 2;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transform: perspective(2400px) rotateY(0deg);
+  transition: transform var(--turn) var(--turn-ease), opacity .3s ease;
+}
+.passport.open .pp-cover { transform: perspective(2400px) rotateY(-180deg); pointer-events: none; }
+.pp-front, .pp-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.pp-back { transform: rotateY(180deg); }
+
+/* Outside: linen made of fine noise, the spine on the left, a foil-embossed
+   frame inside. Corners rounder on the right than at the spine. */
+.pp-front {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 30px 56px 40px;
+  border: 0;
+  border-radius: 6px 20px 20px 6px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .34) 0, rgba(0, 0, 0, .1) 14px, rgba(255, 255, 255, .05) 17px, transparent 26px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 55% 25%, #26385f 0%, var(--cover) 55%, var(--cover-deep) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .06) inset,
+    0 30px 60px -20px rgba(0, 0, 0, .7),
+    0 8px 18px -8px rgba(0, 0, 0, .5);
+  color: var(--foil);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.pp-front::before {
+  content: "";
+  position: absolute;
+  inset: 12px 12px 12px 24px;
+  border: 1px solid color-mix(in srgb, var(--foil) 45%, transparent);
+  border-radius: 4px 12px 12px 4px;
+  pointer-events: none;
+}
+.pp-front:focus-visible { outline: 2px solid var(--cover-text); outline-offset: 4px; }
+.pp-type {
+  position: absolute;
+  bottom: 30px;
+  left: 12px;
+  right: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foil) 70%, transparent);
+}
+
+.brand {
+  font-family: var(--display);
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: .05em;
+}
+/* Debossed: the lines sit recessed - a dark bottom edge is enough. */
+.emblem {
+  width: 110px;
+  height: 110px;
+  margin: 8px 0 4px;
+  filter: drop-shadow(0 1.5px 0 rgba(6, 12, 28, .7));
+}
+/* Foil: a gold gradient in the lettering, swept once by a streak of light on
+   opening. The shadow has to be a filter - text-shadow would show through
+   the transparent text. */
+.brand, .brand-sub {
+  background: linear-gradient(100deg, #a98f55 0%, #d9c48d 38%, #fff2c8 50%, #d9c48d 62%, #a98f55 100%) 100% 0 / 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1.5px 0 rgba(6, 12, 28, .7));
+  animation: foil-sheen 2.2s ease-in-out .4s both;
+}
+@keyframes foil-sheen {
+  from { background-position: 100% 0; }
+  to   { background-position: 0 0; }
+}
+.brand-sub {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+/* Inside: endpaper, a touch darker than the pages, with fine rings like a
+   security print. The back of the cover and the left page carry the same
+   paper so the switch after opening goes unnoticed. */
+.pp-inner, .pp-back {
+  background:
+    repeating-radial-gradient(circle at 50% 42%, transparent 0 9px, rgba(31, 45, 77, .05) 9px 10px),
+    var(--paper-sink);
+  border-radius: 18px 4px 4px 18px;
+}
+.pp-inner::after, .pp-back::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  background: linear-gradient(270deg, rgba(31, 45, 77, .18), transparent);
+  pointer-events: none;
+}
+.pp-inner {
+  --fg: var(--ink);
+  --muted: var(--ink-2);
+  --line: var(--ink);
+  --focus: var(--ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 30px 34px 26px 32px;
+  color: var(--ink);
+}
+.pp-emblem { width: 60px; height: 60px; color: #b9c7b8; }
+.pp-notes { display: grid; gap: 10px; }
+.pp-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.pp-claim {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+.pp-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 15px; color: var(--ink-2); }
+.pp-steps li { display: flex; gap: 12px; align-items: baseline; }
+.pp-steps b { flex: 0 0 20px; font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--ink); }
+.hall-link {
+  align-self: flex-start;
+  padding: 7px 13px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  cursor: pointer;
+}
+.hall-link:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+
+/* The data page: rounded on the right, the fold on the left. */
+/* The height roughly keeps a passport's aspect ratio (88 x 125 mm); the
+   cover sits in the same grid cell and ends up the same size. */
+.home-card {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(var(--pw) * 1.32);
+  padding: 20px 26px 16px;
+  border-radius: 4px 18px 18px 4px;
+  container-type: inline-size;
+}
+.home-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 24px;
+  background: linear-gradient(90deg, rgba(31, 45, 77, .16), transparent);
+  pointer-events: none;
+}
+
+/* Data page header, small and bilingual like in a real passport */
+.datapage-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* Photo on the left, the fields beside it - the name is the only thing you
+   fill in. Number and date are decoration. */
+.dp-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 20px; }
+.dp-photo { display: grid; justify-items: center; gap: 10px; }
+#home-photo .photo { width: 88px; height: 106px; border-width: 3.5px; }
+#home-photo .photo .face { stroke-width: 1.2; }
+.die-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.die-btn:hover { border-color: var(--ink); }
+.die-btn .die { width: 13px; height: 13px; margin-right: 5px; vertical-align: 0; }
+.die-btn:active .die { transform: rotate(90deg); }
+.dp-fields { display: grid; gap: 11px; min-width: 0; }
+.dp-field { display: grid; gap: 4px; min-width: 0; }
+.dp-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.dp-label em { font-style: normal; font-weight: 500; }
+.dp-value { font-family: var(--mono); font-size: 14px; letter-spacing: .04em; }
+#input-name { padding: 8px 11px; font-size: 17px; font-weight: 700; }
+#input-name::placeholder { font-weight: 500; }
+
+/* The entry stamp lands on the data page when you enter the lobby. */
+.home-stamp {
+  --tilt: -9deg;
+  position: absolute;
+  z-index: 2;
+  top: 118px;
+  right: 24px;
+  display: grid;
+  justify-items: center;
+  padding: 5px 14px 4px;
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  color: var(--green);
+  font-family: var(--display);
+  line-height: 1;
+  text-transform: uppercase;
+  transform: rotate(var(--tilt));
+  mix-blend-mode: multiply;
+  opacity: 0;
+  pointer-events: none;
+}
+.home-stamp b { font-size: 34px; font-weight: 900; letter-spacing: .06em; }
+.home-stamp span { margin-top: 3px; font-size: 14px; font-weight: 800; letter-spacing: .12em; }
+.home-stamp.on { animation: stamp-slam .5s cubic-bezier(.3, 1.3, .5, 1) forwards; }
+
+.mrz.home-mrz {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+  font-size: clamp(8px, calc(100cqw / 23), 16px);
+}
+
+/* Below the closed passport - disappears as soon as it's open. */
+.open-hint {
+  padding: 8px 18px;
+  border: 1px solid var(--cover-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cover-muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .3s ease, color .15s ease, border-color .15s ease;
+}
+.open-hint:hover { color: var(--cover-text); border-color: var(--cover-muted); }
+.passport.open + .open-hint { opacity: 0; visibility: hidden; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px dashed var(--rule); }
+
+.join-row { display: flex; gap: 9px; }
+.join-row input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: .24em;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 22px;
+  padding-block: 7px;
+  text-align: center;
+}
+.join-row .btn { flex: 0 0 auto; }
+
+/* ---------- Start with an invite ---------- */
+
+/* Anyone arriving via a shared link already has the code and almost always
+   wants to join. So the two paths swap place and weight: "Join" becomes the
+   main action, "Create lobby" the quiet way out. */
+
+.home-actions { display: flex; flex-direction: column; }
+
+.home-card.invited .join-block { order: 1; }
+.home-card.invited .divider    { order: 2; }
+.home-card.invited #btn-create { order: 3; }
+
+.invite-note {
+  margin-bottom: 11px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.home-card.invited .join-row { flex-wrap: wrap; }
+.home-card.invited .join-row input { flex: 1 0 100%; }
+
+.home-card.invited #btn-join {
+  flex: 1 0 100%;
+  background: var(--primary);
+  border-color: transparent;
+  color: #fff;
+  padding: 12px 22px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 23px;
+  letter-spacing: .03em;
+}
+.home-card.invited #btn-join:hover:not(:disabled) { background: var(--primary-hover); }
+
+.home-card.invited #btn-create {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink);
+  padding: 8px 14px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.home-card.invited #btn-create:hover:not(:disabled) { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+
+#home-warning { margin-top: 16px; }
+.home-card .home-actions { margin-bottom: 18px; }
+
+
+/* ---------- Transition between passport and lobby ---------- */
+
+/* A screen being replaced stays underneath the new one. */
+.screen.held { display: block; }
+#screen-home.held { display: grid; }
+#screen-home { transition: opacity .6s ease; }
+.screen.faded { opacity: 0; }
+
+#screen-lobby .lobby-head,
+#screen-lobby .lobby-foot { transition: opacity .35s ease; }
+#screen-lobby.arriving .lobby-head,
+#screen-lobby.arriving .lobby-foot { opacity: 0; pointer-events: none; }
+
+.spread.growing { transition: transform .68s cubic-bezier(.3, .1, .2, 1), opacity .4s ease; }
+
+/* Two blank leaves over the spread: endpaper on the left like the inside of
+   the cover, on the right the leaf that turns. */
+.turn-under, .turn-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  transition: opacity .3s ease;
+}
+.turn-under.gone, .turn-leaf.gone { opacity: 0; }
+.turn-under {
+  left: 0;
+  right: 50%;
+  border-radius: 14px 0 0 14px;
+  background:
+    repeating-radial-gradient(circle at 50% 42%, transparent 0 9px, rgba(31, 45, 77, .05) 9px 10px),
+    var(--paper-sink);
+}
+.turn-leaf {
+  left: 50%;
+  right: 0;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transform: perspective(2400px) rotateY(0deg);
+  transition: transform var(--turn) var(--turn-ease), opacity .3s ease;
+}
+.turn-leaf.turned { transform: perspective(2400px) rotateY(-180deg); }
+.turn-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 0 14px 14px 0;
+}
+.turn-face.back { transform: rotateY(180deg); border-radius: 14px 0 0 14px; background: var(--paper); }
+/* While turning, shadow falls across the leaf, darkest when upright. */
+.turn-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(8, 14, 30, .28), rgba(8, 14, 30, .04));
+  opacity: 0;
+  pointer-events: none;
+}
+.turn-leaf.turning .turn-face::after { animation: page-shade var(--turn) var(--turn-ease); }
+@keyframes page-shade { 50% { opacity: 1; } }
+
+/* Arrived: the travellers slide in, the room code gets stamped. */
+.spread.arrive .player-list li { animation: slide-in .4s cubic-bezier(.2, .8, .3, 1) backwards; }
+.spread.arrive .code-stamp { animation: stamp-press .45s cubic-bezier(.3, 1.4, .5, 1) .12s backwards; }
+
+/* ---------- Lobby: the open passport ---------- */
+
+#screen-lobby { overflow-y: auto; }
+
+.lobby-wrap {
+  max-width: 1320px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 20px 40px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lobby-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+.lobby-brand {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: .04em;
+}
+.lobby-head-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lobby-head .btn { height: 40px; }
+.share-note { flex: 1 0 100%; text-align: right; font-size: 13px; }
+
+.share-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 380px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--cover-line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--cover-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.share-link:hover { border-color: var(--cover-muted); }
+.share-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-copy {
+  flex: 0 0 auto;
+  padding-left: 10px;
+  border-left: 1px solid var(--cover-line);
+  font-weight: 700;
+  color: var(--cover-text);
+}
+/* Browsers lock text inside buttons - we need it selectable as a copy fallback. */
+.code-badge, .share-url { -webkit-user-select: text; user-select: text; }
+
+.spread {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-radius: 14px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, .35);
+}
+/* The fold: a line with a hint of shadow on either side. */
+.spread::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 24px);
+  width: 48px;
+  background: linear-gradient(90deg,
+    transparent, rgba(31, 45, 77, .05) 45%, #c4d1c4 calc(50% - 1px),
+    #c4d1c4 calc(50% + 1px), rgba(31, 45, 77, .05) 55%, transparent);
+  pointer-events: none;
+}
+
+.page {
+  position: relative;
+  min-width: 0;
+  padding: 30px 40px 26px;
+}
+.page h2 { font-size: 32px; }
+
+/* Left: travellers, chat and the machine-readable zone */
+.lobby-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  /* The MRZ line sizes its font from the page width. */
+  container-type: inline-size;
+}
+.lobby-col h2 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.lobby-col .count { font-family: var(--body); font-size: 17px; font-weight: 600; color: var(--muted); }
+
+.player-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.player-list li { display: flex; align-items: center; gap: 16px; min-height: 58px; }
+.player-list li.arrive { animation: slide-in .4s cubic-bezier(.2, .8, .3, 1) backwards; }
+.player-list .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.player-list .name { font-size: 19px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-list .role { font-size: 14px; color: var(--muted); }
+.player-list .stamp { font-size: 19px; padding: 2px 11px; --tilt: -4deg; }
+.player-list li.off { opacity: .5; }
+/* Host tools in the row: only on hover, always on touch. */
+.player-list .row-tools { display: flex; gap: 4px; opacity: 0; transition: opacity .15s ease; }
+.player-list li:hover .row-tools, .player-list li:focus-within .row-tools { opacity: 1; }
+@media (hover: none) { .player-list .row-tools { opacity: 1; } }
+.player-list .row-tools .btn-icon { font-size: 15px; }
+.player-list .row-tools .btn-icon.armed { background: var(--red); border-color: var(--red); color: #fff; font-family: var(--body); font-size: 13px; font-weight: 700; width: auto; padding: 0 10px; }
+
+/* Photo: the player colour with an initial. The thin border holds even light
+   colours together on the paper. */
+.photo {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 58px;
+  /* Photo paper: a narrow cream-white border, a slight sheen from the top
+     left, a hint of yellowing at the bottom - and a shadow, since it rests on top. */
+  border: 2.5px solid #f4f1e6;
+  border-radius: 2px;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, .22) 0%, transparent 38%, transparent 70%, rgba(120, 90, 30, .1) 100%),
+    var(--c);
+  box-shadow:
+    0 1px 1.5px rgba(20, 28, 48, .28),
+    0 4px 8px -4px rgba(20, 28, 48, .35);
+  transform: rotate(var(--rot, 0deg));
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 30px;
+  line-height: 1;
+}
+
+/* Sticky tape: semi-transparent, slightly yellowish, torn ends. */
+.tape {
+  position: absolute;
+  z-index: 1;
+  width: 62%;
+  height: 11px;
+  background:
+    linear-gradient(rgba(255, 255, 255, .5) 0 1px, transparent 1px calc(100% - 1px), rgba(160, 140, 80, .25) calc(100% - 1px)),
+    linear-gradient(rgba(252, 246, 214, .72), rgba(232, 222, 180, .6));
+  box-shadow: 0 .5px 1.5px rgba(20, 28, 48, .2);
+  clip-path: polygon(0 12%, 4% 0, 96% 0, 100% 18%, 97% 38%, 100% 58%, 96% 78%, 100% 100%, 4% 100%, 0 84%, 3% 64%, 0 44%, 3% 24%);
+  pointer-events: none;
+}
+.tape.top { top: -6px; left: 19%; transform: rotate(var(--tape-rot, 0deg)); }
+.tape.tl  { top: -1px; left: -9px; width: 52%; transform: rotate(-40deg); }
+.tape.tr  { top: -1px; right: -9px; width: 52%; transform: rotate(40deg); }
+.tape.br  { bottom: -1px; right: -9px; width: 52%; transform: rotate(-40deg); }
+
+/* The drawn face fills the photo. Stroke width is in viewBox units and gets
+   thicker on small pictures, where brows, wrinkles and small details drop out. */
+.photo .face { width: 100%; height: 100%; display: block; stroke-width: 1.5; opacity: .92; }
+/* In the HUD the photo is too small for tape and border. */
+.hud-players .photo { border-width: 1.5px; }
+.hud-players .photo .tape { display: none; }
+.face .fill { fill: currentColor; stroke: none; }
+.face .soft { stroke-width: .8; opacity: .75; }
+.face .thick { stroke-width: 1.9; }
+.hud-players .photo .face { stroke-width: 2.3; }
+.hud-players .photo .face .detail { display: none; }
+
+#hall-title .photo { display: inline-grid; width: 40px; height: 48px; margin-right: 12px; vertical-align: -8px; }
+
+.die { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; }
+#btn-face:active .die { transform: rotate(90deg); }
+.color-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.color-pick { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--rule); }
+.color-label { font-size: 15px; font-weight: 600; color: var(--muted); }
+.swatches { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(31, 45, 77, .25);
+  transition: transform .12s ease;
+}
+.swatch:hover:not(:disabled) { transform: translateY(-2px); }
+/* Your own colour gets a ring. */
+.swatch.mine { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+
+/* Taken: paler, with the owner's initial - so you see whose colour it is,
+   not just that it's gone. */
+.swatch:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* The machine-readable zone: 44 characters per line, the font sized so both
+   lines fit the page width exactly. */
+.mrz {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: clamp(7px, calc(100cqw / 33), 17px);
+  letter-spacing: .12em;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: hidden;
+  color: #3b4a68;
+}
+
+/* Right: the travel conditions */
+
+.code-stamp {
+  position: absolute;
+  top: 22px;
+  right: 34px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 18px 4px;
+  border-width: 4px;
+  border-radius: 12px;
+  color: var(--red);
+  --tilt: 6deg;
+}
+.code-stamp-label { font-size: 15px; letter-spacing: .1em; }
+.code-badge {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 52px;
+  line-height: .95;
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.code-badge:hover { color: #8f1f28; }
+
+/* Heading and hint don't run under the stamp. */
+.page > h2, .panel-note { margin-right: 190px; }
+.panel-note { margin-top: 8px; font-size: 15px; color: var(--muted); }
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 20px;
+}
+.mode-switch button {
+  padding: 9px 14px 10px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.mode-switch button strong { display: block; font-size: 17px; font-weight: 700; }
+.mode-switch button em { display: block; margin-top: 1px; font-size: 14px; font-style: normal; color: var(--ink-2); }
+.mode-switch button:hover:not(:disabled, .on) { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.mode-switch button.on { background: var(--ink); color: var(--paper); }
+/* The selected one stays dark on hover - otherwise light text would sit on a light background. */
+.mode-switch button.on:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 88%, var(--paper)); }
+.mode-switch button.on em { color: #c9d2e2; }
+/* Guests see the host's choice - the selected tile stays fully readable. */
+.mode-switch button:disabled { cursor: default; }
+.mode-switch button:disabled:not(.on) { opacity: .5; }
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+.setting label { font-size: 16px; white-space: nowrap; }
+.stepper { display: flex; align-items: center; }
+.stepper output {
+  min-width: 52px;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+.duel-hint { margin-top: 10px; }
+
+/* Teams: a tick box like on a form */
+.toggle { position: relative; display: block; margin-top: 12px; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-body {
+  position: relative;
+  display: block;
+  padding: 11px 14px 12px 48px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+.toggle-body::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 14px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+}
+.toggle input:checked + .toggle-body::before { background: var(--ink); }
+.toggle input:checked + .toggle-body::after {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 17px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--paper);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.toggle-body strong { display: block; font-size: 17px; font-weight: 700; }
+.toggle-body em { display: block; margin-top: 1px; font-size: 14px; font-style: normal; color: var(--ink-2); }
+.toggle input:focus-visible + .toggle-body { outline: 2px solid var(--ink); outline-offset: 2px; }
+.toggle input:disabled + .toggle-body { cursor: default; }
+.toggle input:disabled:not(:checked) + .toggle-body { opacity: .55; }
+
+#btn-nmpz { margin-top: 14px; }
+
+.lobby-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lobby-foot-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.lobby-foot #start-hint { font-size: 17px; color: var(--cover-text); }
+.lobby-foot #btn-start { height: 56px; padding: 0 20px; font-size: 16px; }
+
+/* ---------- Voting on No Move / No Pan / No Zoom ---------- */
+/* One row per restriction between dashed rules: on top what it does and what
+   applies, below it the votes. Red means one thing only - "applies at start",
+   as a stamp. Your own vote is filled ink-blue so it isn't mistaken for the
+   result. */
+
+.toggles { margin-top: 14px; }
+.vote-card { border-top: 1px dashed var(--rule); }
+.vote-card:last-child { border-bottom: 1px dashed var(--rule); }
+
+.vote-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 6px;
+}
+.vote-text { flex: 1; min-width: 0; }
+.vote-text strong { display: block; font-size: 17px; font-weight: 700; }
+.vote-text em { display: block; font-size: 14px; font-style: normal; color: var(--ink-2); }
+
+/* The result, spelled out: "Off" quiet, "On" stamped */
+.vote-result {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 52px;
+  justify-content: center;
+  padding: 0 8px;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1.15;
+  color: var(--ink-2);
+}
+.vote-card.on .vote-result {
+  border-color: var(--red);
+  color: var(--red);
+  transform: rotate(-5deg);
+  mix-blend-mode: multiply;
+}
+.vote-result svg { width: 12px; height: 12px; }
+
+.vote-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 0 0 11px;
+}
+
+.seg { display: inline-flex; gap: 6px; }
+.seg button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-raise);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.seg button b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.seg button:hover { border-color: var(--ink); }
+.seg button[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+.seg button[data-vote][aria-pressed="true"]::before { content: "✓"; margin-right: -2px; }
+
+.vote-state { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); }
+
+/* The map pack: seven choice buttons that may wrap. The result on the right
+   is a name, not on/off - hence slightly smaller. */
+.pack-seg { flex-wrap: wrap; width: 100%; }
+.pack-seg button { height: 32px; padding: 0 10px; }
+.pack-card .vote-result { font-size: 17px; }
+.pack-card.on .vote-result { transform: rotate(-4deg); }
+.vote-card.locked:not(:has(.seg)) .vote-state { color: var(--ink); }
+
+.vote-link {
+  appearance: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+.vote-link:hover { text-decoration-color: currentColor; }
+
+/* ---------- Team duel in the lobby ---------- */
+/* --team is the team colour, set by the script. Team colours are light - no
+   good as text on paper, so ink with a colour swatch. */
+
+.player-list li.team-head {
+  min-height: 0;
+  gap: 10px;
+  padding: 10px 0 6px;
+  border-bottom: 3px solid var(--team);
+}
+.player-list li.team-head:not(:first-child) { margin-top: 10px; }
+.player-list .team-name { flex: 1; font-family: var(--display); font-size: 24px; font-weight: 800; }
+.player-list .team-head .count { font-size: 15px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.player-list .team-head .btn { padding: 5px 12px; font-size: 14px; }
+.player-list .tag.mine { font-size: 14px; font-weight: 600; color: var(--muted); }
+.player-list li.team-empty { min-height: 0; color: var(--muted); font-size: 15px; font-style: italic; }
+
+/* ---------- Loading ---------- */
+
+#screen-loading { display: none; place-items: center; }
+#screen-loading.active { display: grid; }
+.loader { text-align: center; padding: 0 16px; }
+.loader h2 { margin: 22px 0 8px; font-size: 32px; }
+
+.spinner {
+  width: 36px; height: 36px;
+  margin: 0 auto;
+  border: 3px solid rgba(232, 239, 231, .18);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Game ---------- */
+/* The panorama belongs to the game - here the passport steps back into small
+   labels of paper and cover blue. */
+
+#pano { position: absolute; inset: 0; background: var(--cover-deep); }
+#pano-lock { position: absolute; inset: 0; z-index: 3; cursor: default; }
+
+.hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  /* above the waiting veil so the timer and guess status stay visible */
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--hud-h);
+  padding: 0 12px;
+  background: linear-gradient(rgba(21, 32, 58, .8), rgba(21, 32, 58, 0));
+  pointer-events: none;
+}
+.hud-spacer { flex: 1; }
+
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: rgba(232, 239, 231, .95);
+  border: 1px solid rgba(31, 45, 77, .2);
+  box-shadow: 0 2px 10px rgba(5, 10, 24, .3);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hud-btn {
+  /* the HUD bar itself lets clicks through - the button must not */
+  pointer-events: auto;
+  font-family: inherit;
+  cursor: pointer;
+}
+.hud-btn:hover { border-color: var(--ink); }
+
+/* The timer as the only cover-style label: big, calm - and red when time runs short. */
+.hud-timer {
+  --fg: var(--cover-text);
+  background: var(--cover);
+  border-color: var(--cover-line);
+  color: var(--cover-text);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 24px;
+  min-width: 68px;
+  justify-content: center;
+}
+.hud-timer.urgent { background: var(--red); border-color: var(--red); color: #fff; }
+
+.hud-multiplier { color: var(--red); }
+
+/* Spectators: an eye in the HUD, names on other players' pins, no submitting. */
+.hud-watch { color: var(--ink-2); border-style: dashed; }
+.pin-label { text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 5px var(--paper); }
+.guess-status.watch { color: var(--ink-2); }
+
+.hud-modes { display: flex; gap: 5px; }
+.hud-modes span {
+  padding: 5px 7px;
+  border-radius: 3px;
+  background: var(--cover);
+  color: var(--cover-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  box-shadow: 0 2px 8px rgba(5, 10, 24, .3);
+}
+
+.hud-players {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* Dot and name on one line, the health bar below at full width - without a
+   bar (classic) it is a plain name tag. */
+.hud-players li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 4px 10px 4px 5px;
+  border-radius: 4px;
+  background: rgba(232, 239, 231, .95);
+  border: 1px solid rgba(31, 45, 77, .2);
+  box-shadow: 0 2px 10px rgba(5, 10, 24, .3);
+  font-size: 13px;
+  font-weight: 600;
+}
+/* The lobby photo, small - whoever has submitted gets the green tick as a
+   stamp after their name. */
+.hud-players .photo { width: 22px; height: 26px; font-size: 14px; }
+.hud-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  --tilt: -10deg;
+}
+.hud-players li.done .name { color: var(--green); }
+.hud-players li.off { opacity: .5; }
+.hud-players li.me { font-weight: 800; }
+.hud-players li .hp, .hud-players li .ko { grid-column: 1 / -1; }
+.hud-players li .hp { min-width: 64px; }
+.hud-players li.out { opacity: .6; }
+.hud-players li.out .name { text-decoration: line-through; }
+.hud-players .ko { font-size: 12px; font-weight: 700; color: var(--red); }
+
+/* Team duel: one bar per team, the players in team colour at the bottom of the label */
+.hud-players li.team-chip { grid-template-columns: 1fr; min-width: 110px; border-left: 5px solid var(--team); }
+.hud-players li.team-chip .name { font-weight: 800; }
+.hud-players li.in-team { box-shadow: inset 0 -3px 0 var(--team), 0 2px 10px rgba(5, 10, 24, .3); }
+
+/* Guess card: a paper card with the red button */
+
+.guess-box {
+  /* Size when expanded - resizable by the handle, JS overrides it. */
+  --guess-w: 720px;
+  --guess-h: 520px;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
+  width: 310px;
+  padding: 9px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px -10px rgba(5, 10, 24, .7);
+  transition: width .18s ease;
+}
+.guess-map {
+  height: 190px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--paper-sink);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  transition: height .18s ease;
+}
+.guess-box:hover,
+.guess-box.pinned,
+.guess-box.resizing { width: min(var(--guess-w), calc(100vw - 28px)); }
+.guess-box:hover .guess-map,
+.guess-box.pinned .guess-map,
+.guess-box.resizing .guess-map { height: min(var(--guess-h), calc(100vh - var(--hud-h) - 120px)); }
+
+/* While dragging, the transition would lag behind the mouse. */
+.guess-box.resizing,
+.guess-box.resizing .guess-map { transition: none; }
+
+/* Handle in the top left corner - the box is anchored bottom right. */
+.guess-resize {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border-top-left-radius: var(--radius);
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.guess-resize::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 11px;
+  height: 11px;
+  border-top: 2px solid var(--ink-2);
+  border-left: 2px solid var(--ink-2);
+  border-top-left-radius: 3px;
+}
+.guess-box:hover .guess-resize,
+.guess-box.pinned .guess-resize,
+.guess-box.resizing .guess-resize { opacity: 1; }
+.guess-resize:hover::before,
+.guess-box.resizing .guess-resize::before { border-color: var(--red); }
+
+.guess-actions { display: flex; gap: 8px; margin-top: 9px; }
+.guess-actions .btn { flex: 1; }
+
+.guess-status {
+  margin-top: 7px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-align: center;
+}
+.guess-status.done { color: var(--green); }
+.guess-status.out { color: var(--ink-2); }
+
+/* ---------- Countdown ---------- */
+
+/* Above everything except the HUD - anyone able to click before the round
+   starts would get a head start. */
+.countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  background: radial-gradient(circle, rgba(28, 42, 72, .72) 0%, rgba(21, 32, 58, .94) 70%);
+  backdrop-filter: blur(3px);
+}
+.countdown-round { font-family: var(--display); font-weight: 800; font-size: 30px; color: var(--cover-muted); }
+.countdown-num {
+  font-family: var(--display);
+  font-size: min(36vw, 240px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--cover-text);
+  font-variant-numeric: tabular-nums;
+}
+.countdown-num.pop { animation: countdown-pop .9s cubic-bezier(.2, .9, .3, 1.2); }
+
+.pause { gap: 14px; }
+.pause-stamp { font-size: min(22vw, 120px); padding: 0 28px; border-width: 6px; border-radius: 18px; --tilt: -6deg; mix-blend-mode: normal; color: #ff8a8a; }
+.pause .btn { margin-top: 10px; }
+@keyframes countdown-pop {
+  0%   { transform: scale(1.6); opacity: 0; }
+  25%  { transform: scale(1);   opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: scale(.85); opacity: .25; }
+}
+
+/* ---------- Round results ---------- */
+
+.reveal-layout { display: flex; height: 100%; }
+.reveal-map { flex: 1; background: var(--paper-sink); }
+
+.reveal-side,
+.final-side {
+  width: 440px;
+  flex: 0 0 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 30px 24px;
+  overflow: hidden;
+  box-shadow: -10px 0 30px rgba(5, 10, 24, .25);
+  z-index: 1;
+}
+.reveal-side { background-position: 0 44%, 0 96%, 0 0; }
+
+.reveal-side header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.reveal-round { font-family: var(--display); font-weight: 800; font-size: 23px; }
+
+.place-link {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 4px;
+}
+.place-link:hover { color: var(--red); text-decoration-color: currentColor; }
+
+/* The entry stamp: double border like a border-control stamp, in green. */
+.entry-stamp {
+  align-self: center;
+  max-width: calc(100% - 16px);
+  margin: 6px 0 8px;
+  padding: 5px;
+  border-width: 4px;
+  border-radius: 18px;
+  color: var(--green);
+  white-space: normal;
+  --tilt: -5deg;
+}
+.entry-stamp-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 22px 9px;
+  border: 2px solid currentColor;
+  border-radius: 12px;
+  text-align: center;
+}
+.entry-stamp-label { font-size: 17px; letter-spacing: .16em; }
+/* The country flag, pale like a security print in passport paper; the fine
+   hatching on top makes it look printed rather than stuck on. */
+.entry-stamp-inner { position: relative; isolation: isolate; overflow: hidden; }
+.stamp-flag {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--flag) center / cover no-repeat;
+  opacity: .3;
+  filter: saturate(.75) contrast(.9);
+}
+.stamp-flag::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .35) 0 1px, transparent 1px 4px);
+}
+.stamp-flag[hidden] { display: none; }
+#reveal-place {
+  /* Long names ("Bourgogne-Franche-Comté") get smaller - the script sets --len
+     to the character count. If need be it may wrap. */
+  font-size: clamp(26px, calc(560px / var(--len, 10)), 52px);
+  font-weight: 900;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+.entry-stamp-sub { font-size: 19px; letter-spacing: .04em; line-height: 1.15; }
+#reveal-place.unknown { font-size: clamp(26px, calc(520px / var(--len, 10)), 40px); }
+.flag { margin-right: 8px; }
+
+.result-list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  /* Askew stamps at the edge must not produce a horizontal scrollbar. */
+  overflow-x: hidden;
+}
+/* Each row carries its own side padding - so a background (own row, team)
+   fits inside without sticking out past the edge. */
+.result-list li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border-top: 1px dashed var(--rule);
+}
+.result-list li:last-child { border-bottom: 1px dashed var(--rule); }
+.result-list li[style*="--in"] { animation: slide-in .45s cubic-bezier(.2, .8, .3, 1) var(--in) backwards; }
+.result-list li[style*="--land"] .pts .stamp { animation: stamp-land .38s ease-out var(--land) backwards; }
+.result-list .photo { width: 44px; height: 52px; font-size: 26px; }
+.result-list li > span:not(.photo):not(.pts) { display: block; min-width: 0; }
+.result-list .name { font-size: 18px; font-weight: 700; }
+.result-list .dist { display: block; font-size: 14px; color: var(--ink-2); }
+.result-list .pts { display: grid; justify-items: end; gap: 4px; text-align: right; padding-right: 4px; }
+.result-list .pts .stamp {
+  padding: 1px 9px;
+  border-width: 3px;
+  border-radius: 8px;
+  font-size: 30px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.result-list .pts small { font-size: 13px; color: var(--ink-2); }
+.result-list .pts-none { font-family: var(--display); font-size: 26px; color: var(--ink-2); }
+.result-list li.miss .name { color: var(--ink-2); }
+.result-list li.miss .photo { opacity: .45; }
+
+/* Your own entry: as if marked with a highlighter - the same in every list.
+   The dashed rules around the row are dropped, the stroke separates it
+   enough. */
+.result-list li.me,
+.podium li.me {
+  border-radius: 8px;
+  border-color: transparent;
+  background: var(--marker);
+}
+.result-list li.me + li,
+.podium li.me + li { border-top-color: transparent; }
+.result-list li.me .name::after,
+.podium li.me .name::after {
+  /* The label text ("you", translated) comes from data-me-label, set by the client. */
+  content: attr(data-me-label);
+  margin-left: 6px;
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.result-list li.me .dist,
+.podium li.me .title-why,
+.podium li.me .title-facts { color: var(--ink-on-marker); }
+
+.mini-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: 2px;
+}
+.mini-tag.ready { color: var(--green); }
+.mini-tag.ko { color: var(--red); }
+.mini-tag.out { color: var(--ink-2); }
+
+/* Duel: the bar under the name - what's left in player colour, this round's
+   loss in red. */
+.hp {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(31, 45, 77, .16);
+  overflow: hidden;
+}
+.hp > span {
+  display: block;
+  height: 100%;
+  width: calc(var(--hp, 0) * 100%);
+  border-radius: 3px;
+  background: var(--hp-color, var(--ink));
+  /* light player colours need an edge, otherwise they disappear */
+  box-shadow: inset 0 0 0 1px rgba(31, 45, 77, .3);
+  transition: width .5s ease;
+}
+.hp-reveal {
+  position: relative;
+  margin-top: 7px;
+  height: 7px;
+  max-width: 100%;
+  border-radius: 4px;
+  background: rgba(31, 45, 77, .14);
+}
+.hp-reveal > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: none; /* the script draws every frame itself */
+}
+/* The standing before the round in red - whatever the coloured remainder no
+   longer covers is the loss. */
+.hp-reveal > .lost { width: calc(var(--hp-before, 0) * 100%); background: var(--red); box-shadow: none; opacity: .8; }
+.hp-reveal > .left { width: calc(var(--hp, 0) * 100%); background: var(--hp-color, var(--ink)); }
+.result-list li.ko .hp-reveal > .lost { opacity: 1; }
+.result-list li.ko .name { color: var(--red); }
+.result-list li.out { opacity: .6; }
+.result-list li.out .name { text-decoration: line-through; }
+
+/* Team duel: the teams on top, lightly tinted in team colour */
+.result-list li.team-row {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--team) 16%, transparent);
+}
+.result-list li.team-row .name { font-family: var(--display); font-size: 22px; font-weight: 800; }
+.result-list li.team-row.mine .name::after {
+  /* The label text ("your team", translated) comes from data-team-label, set by the client. */
+  content: attr(data-team-label);
+  margin-left: 8px;
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.result-list li.team-row + li.teammate { margin-top: 12px; }
+.team-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: var(--team);
+  box-shadow: inset 0 0 0 1px rgba(31, 45, 77, .3);
+}
+
+.reveal-side footer,
+.final-side footer { display: grid; gap: 9px; text-align: center; }
+
+/* ---------- Final standings ---------- */
+
+#screen-final { display: none; }
+#screen-final.active { display: block; }
+
+.final-layout { display: flex; height: 100%; }
+.final-map-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  --pip-w: min(38%, 330px);
+  --pip-h: min(40%, 240px);
+}
+.final-map, .final-pano { position: absolute; inset: 0; background: var(--paper-sink); }
+
+/* Street View only exists for a single round. */
+.final-pano, .pip-swap { display: none; }
+.final-map-wrap.with-street .final-pano,
+.final-map-wrap.with-street .pip-swap { display: block; }
+
+/* Picture in picture: the small view sits bottom right, the swap button
+   right above it. Unlike in the game, the map is on top here. */
+.final-map-wrap.with-street .final-pano,
+.final-map-wrap.with-street.street-big .final-map {
+  inset: auto 14px 14px auto;
+  width: var(--pip-w);
+  height: var(--pip-h);
+  border: 4px solid var(--paper);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 5;
+}
+.final-map-wrap.with-street.street-big .final-pano {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 1;
+}
+.pip-swap {
+  position: absolute;
+  right: 14px;
+  bottom: calc(14px + var(--pip-h) + 8px);
+  z-index: 6;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: var(--paper);
+  border: 1px solid rgba(31, 45, 77, .2);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(5, 10, 24, .3);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pip-swap:hover { border-color: var(--ink); }
+
+.final-side { background-position: 0 30%, 0 92%, 0 0; }
+.final-side header { display: grid; gap: 2px; }
+.final-sub { font-size: 15px; color: var(--ink-2); }
+.final-title { font-size: 34px; }
+
+/* Award ceremony: places from last to first, the title stamp shortly after
+   its row, the winner stamp last and with force. */
+.podium li { animation: slide-in .5s cubic-bezier(.2, .8, .3, 1) var(--d, 0ms) backwards; }
+.podium li .title-stamp { animation: stamp-press .42s cubic-bezier(.3, 1.4, .5, 1) calc(var(--d, 0ms) + 350ms) backwards; }
+.win-stamp.press { animation: stamp-slam .6s cubic-bezier(.3, 1.2, .5, 1) var(--d, .18s) backwards; }
+.final-side.thud { animation: thud .28s ease-out; }
+
+/* The winner as a stamp - the one loud moment of the final standings. */
+.win-stamp {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100% - 16px);
+  margin: 2px 0 6px 6px;
+  padding: 5px 18px 7px;
+  border-width: 4px;
+  border-radius: 12px;
+  color: var(--red);
+  white-space: normal;
+  --tilt: -4deg;
+}
+.win-stamp-label { font-size: 16px; letter-spacing: .1em; }
+.win-stamp-name { font-size: 44px; font-weight: 900; line-height: .95; overflow-wrap: anywhere; }
+
+/* Toggle rounds on and off so the lines don't become a tangle. */
+.map-tools {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: calc(100% - 28px);
+}
+.round-filter { display: flex; flex-wrap: wrap; gap: 5px; }
+.round-filter button, .street-toggle, .final-place {
+  padding: 6px 11px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid rgba(31, 45, 77, .2);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(5, 10, 24, .25);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+.round-filter button, .street-toggle { cursor: pointer; }
+.round-filter button { min-width: 34px; font-variant-numeric: tabular-nums; }
+.round-filter button:hover, .street-toggle:hover { border-color: var(--ink); }
+.round-filter button.on, .street-toggle.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.final-place { max-width: 280px; }
+
+.podium { flex: 1; margin: 0; padding: 0; list-style: none; overflow-y: auto; overflow-x: hidden; }
+.podium li {
+  display: grid;
+  grid-template-columns: 22px 40px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 12px;
+  padding: 14px 12px;
+  border-top: 1px dashed var(--rule);
+}
+.podium li:last-child { border-bottom: 1px dashed var(--rule); }
+.podium .rank {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--ink-2);
+  text-align: center;
+}
+/* Rank and photo stay up top by the name, even when the title gets long */
+.podium .rank { align-self: start; padding-top: 10px; }
+.podium .photo { align-self: start; width: 40px; height: 48px; font-size: 24px; }
+.podium .who { min-width: 0; display: grid; gap: 7px; justify-items: start; }
+/* Title stamp and explanation may reach under the points - beside the points
+   column there would be too little room for the longest titles. The points
+   sit top right in the same row, the name makes way for them. */
+.podium .who { grid-column: 3 / 5; grid-row: 1; }
+.podium .pts { grid-column: 4; grid-row: 1; }
+.podium .who .title-why { margin-top: 1px; }
+.podium .name { max-width: calc(100% - 96px); font-size: 18px; font-weight: 700; line-height: 34px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Title stamps: one stamp style per group of the title catalogue. They all
+   share the entry stamp's structure - group small on top, title large below,
+   icon in front. Border and ink tell the groups apart. */
+.title-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 10px);
+  margin: 2px 0 2px 3px;
+  padding: 3px 11px 4px 8px;
+  border-width: 3px;
+  border-radius: 6px;
+  white-space: normal;
+}
+.title-stamp svg { flex: 0 0 20px; width: 20px; height: 20px; }
+.ts-text { display: flex; flex-direction: column; min-width: 0; line-height: 1; }
+.ts-label { font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.ts-name { font-size: clamp(17px, calc(400px / var(--len, 12)), 21px); font-weight: 900; hyphens: auto; overflow-wrap: break-word; }
+
+.ts-treffer { color: var(--red); border: 5px double; border-radius: 9px; }
+.ts-form { color: #2b3f6b; border-radius: 3px; }
+.ts-geografie { color: var(--green); border-radius: 999px; padding-inline: 11px 16px; }
+.ts-karte { color: #1f5f8b; border-style: dashed; }
+.ts-tempo { color: #9a4a14; box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3.5px currentColor; }
+.ts-streetview { color: #1d6b69; border: 5px double; border-radius: 999px; padding-inline: 11px 16px; }
+.ts-vermerk { color: var(--grey-ink); border-width: 2px; border-radius: 4px; padding-left: 11px; }
+/* On your own row's highlighter the inner rule takes the highlighter's colour. */
+.podium li.me .ts-tempo { box-shadow: inset 0 0 0 2px var(--marker-solid), inset 0 0 0 3.5px currentColor; }
+.podium .title-why { font-size: 14px; color: var(--ink-2); line-height: 1.35; }
+.podium .title-facts { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.podium .pts {
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 900;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.podium .pts small {
+  display: block;
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.podium .pts.out { font-size: 20px; color: var(--ink-2); }
+.podium li.first .rank, .podium li.first .pts { color: var(--red); }
+.podium .hp { margin-top: 5px; max-width: 220px; }
+.podium li.out { opacity: .65; }
+.podium li.out .name { text-decoration: line-through; }
+
+/* Final standings: the teams above the individual ranking */
+.team-board { margin: 0 0 4px; padding: 0; list-style: none; display: grid; gap: 8px; }
+.team-board li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-left: 5px solid var(--team);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--team) 14%, transparent);
+}
+.team-board .who { display: grid; gap: 5px; min-width: 0; }
+.team-board .name { font-family: var(--display); font-size: 24px; font-weight: 800; }
+.team-board .title-why { font-size: 14px; color: var(--ink-2); }
+.team-board .hp { max-width: 240px; height: 6px; }
+.team-board .pts { font-family: var(--display); font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; text-align: right; }
+.team-board .pts small { display: block; font-family: var(--body); font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.team-board li.first .pts { color: var(--red); }
+.team-board li.out { opacity: .65; }
+.team-board li.out .name { text-decoration: line-through; }
+
+.team-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--team) 35%, var(--paper));
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: 2px;
+}
+
+/* ---------- Sound ---------- */
+
+.sound-btn { display: inline-flex; align-items: center; gap: 7px; }
+.sound-btn .sound-icon { display: inline-flex; width: 17px; height: 17px; }
+.sound-btn .sound-icon svg { width: 100%; height: 100%; display: block; }
+/* Off: the button steps back so "on" stays the calm default. */
+.sound-btn[aria-pressed="false"] { color: var(--muted); }
+#btn-sound { padding: 0 10px; }
+/* Start screen: top right on the table, in the style of the "Open passport" button. */
+.home-sound {
+  position: absolute; top: 16px; right: 16px;
+  padding: 7px 14px;
+  border: 1px solid var(--cover-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cover-muted);
+  font: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer;
+}
+.home-sound:hover { color: var(--cover-text); border-color: var(--cover-muted); }
+@media (max-width: 760px) {
+  /* On phones it would sit on top of the passport - there it goes in the row above. */
+  .home-sound { position: static; justify-self: end; grid-row: 1; }
+}
+
+/* ---------- Stats, Hall of Fame, personal summary ---------- */
+/* Paper pages laid on top of the cover. */
+
+.stats-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(21, 32, 58, .86);
+  backdrop-filter: blur(3px);
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, 1000px);
+  max-height: 100%;
+  padding: 24px 28px;
+  border-radius: 12px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, .4);
+  /* Guilloche only as a band at top and bottom - over tables and tiles it
+     would just be noisy. */
+  background-position: 0 -34px, 0 calc(100% + 34px);
+}
+.stats-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.stats-card h2 { margin-top: 2px; font-size: 34px; }
+.stats-card .hint { font-size: 13px; }
+.stats-card .btn-icon { height: 40px; }
+
+.stats-scroll { overflow: auto; border: 1px solid var(--rule); border-radius: var(--radius-sm); background: var(--paper-raise); }
+
+.stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.stats-table th, .stats-table td {
+  padding: 8px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.stats-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper-sink);
+  font-weight: 700;
+}
+.stats-table thead th .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(31, 45, 77, .35);
+}
+/* First column: the metric itself */
+.stats-table th:first-child, .stats-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  background: var(--paper-raise);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.stats-table thead th:first-child { z-index: 2; background: var(--paper-sink); color: var(--ink); font-weight: 700; }
+.stats-table td { font-variant-numeric: tabular-nums; }
+.stats-table tbody tr:last-child th, .stats-table tbody tr:last-child td { border-bottom: none; }
+.stats-table td.best { color: var(--red); font-weight: 700; }
+
+.hall-records {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.hall-record {
+  padding: 12px 14px;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+}
+.hall-record .label { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.hall-record .value {
+  margin-top: 2px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.05;
+  color: var(--red);
+  font-variant-numeric: tabular-nums;
+}
+.hall-record .who { margin-top: 2px; font-size: 15px; font-weight: 700; }
+.hall-record .where { margin-top: 1px; font-size: 13px; color: var(--ink-2); }
+/* The Hall of Fame records are visa stamps: each in its own ink, slightly
+   askew, pressed on one after another on opening. */
+.hall-records .hall-record {
+  --tilt: -2deg;
+  border: 3px solid currentColor;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 3px var(--paper), inset 0 0 0 4px currentColor;
+  padding: 14px 18px;
+  color: var(--red);
+  transform: rotate(var(--tilt));
+  mix-blend-mode: multiply;
+  animation: stamp-press .42s cubic-bezier(.3, 1.4, .5, 1) backwards;
+}
+.hall-records .hall-record:nth-child(2) { --tilt: 1.5deg; color: var(--green); animation-delay: .14s; }
+.hall-records .hall-record:nth-child(3) { --tilt: -1deg; color: #2b3f6b; animation-delay: .28s; }
+.hall-records .hall-record .label { color: inherit; font-family: var(--display); font-size: 15px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.hall-records .hall-record .value { color: inherit; }
+.hall-records .hall-record .who { color: var(--ink); }
+
+.rank-col { display: inline-block; width: 30px; margin-right: 6px; text-align: center; color: var(--ink-2); font-weight: 700; }
+.rank-stamp { font-size: 17px; padding: 0 7px; --tilt: -6deg; }
+.rank-1 { color: var(--red); border-width: 3px; }
+.rank-2 { color: var(--green); }
+.rank-3 { color: #2b3f6b; }
+
+
+/* Here the name column carries the player, not a metric. */
+.hall-card .stats-table tbody th { color: var(--ink); font-weight: 700; }
+.hall-card .stats-table td.title-cell { color: var(--ink-2); white-space: normal; }
+
+.hall-empty { padding: 22px; text-align: center; color: var(--ink-2); font-size: 15px; }
+
+.hall-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.hall-main { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+
+.name-link {
+  appearance: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dashed var(--ink-2);
+  text-underline-offset: 4px;
+}
+.name-link:hover { color: var(--red); text-decoration-color: currentColor; }
+
+.profile { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; min-height: 0; }
+.profile h3 { margin-bottom: 9px; font-size: 22px; }
+.profile h3 small { margin-left: 8px; font-family: var(--body); font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; }
+
+/* The header as a data page: photo on the left, the record as passport fields. */
+.profile-dp { container-type: inline-size; padding-bottom: 14px; border-bottom: 1px solid var(--rule-soft); }
+.profile-dp .dp-id { margin-bottom: 10px; gap: 22px; }
+.profile-dp .photo { width: 92px; height: 112px; border-width: 3.5px; }
+.profile-dp .dp-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 22px; align-self: center; }
+.profile-dp .dp-value { font-size: 19px; font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.profile-mrz { font-size: clamp(7px, calc(100cqw / 30), 16px); }
+
+/* The printed world map (worldmap.js): ink on paper, sea in passport blue. */
+.profile-map { border: 1.5px solid var(--ink); border-radius: var(--radius-sm); overflow: hidden; line-height: 0; }
+.wm { display: block; width: 100%; height: auto; }
+.wm-sea { fill: #d6e1ea; }
+.wm-grat { fill: none; stroke: #b3c4d4; stroke-width: .5; stroke-dasharray: 2 3; }
+.wm-land { fill: #eef1e8; stroke: #8a97ab; stroke-width: .5; }
+.wm-land.wm-good { fill: var(--green); }
+.wm-land.wm-mid { fill: #2b3f6b; }
+.wm-land.wm-bad { fill: var(--red); }
+.wm-dot { stroke: #fbfbf6; stroke-width: 1.3; cursor: pointer; }
+.wm-dot.wm-good { fill: var(--green); }
+.wm-dot.wm-mid { fill: #2b3f6b; }
+.wm-dot.wm-bad { fill: var(--red); }
+.wm-dot:hover, .wm-dot.on { stroke: var(--ink); stroke-width: 2; }
+.wm-line { fill: none; stroke: var(--ink); stroke-width: 1.4; stroke-dasharray: 4 3; }
+.wm-guess { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
+.profile-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.profile-legend span { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.profile-legend i { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1.3px #fbfbf6, 0 0 0 2.3px rgba(31, 45, 77, .25); }
+.profile-legend i.wm-good { background: var(--green); }
+.profile-legend i.wm-mid { background: #2b3f6b; }
+.profile-legend i.wm-bad { background: var(--red); }
+.profile-pick { margin: 4px 0 0; min-height: 1.4em; font-size: 14px; font-weight: 600; }
+
+/* Continents: bars showing the share of 5,000 points */
+.profile-bars { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.profile-bars li {
+  display: grid;
+  grid-template-columns: 96px 1fr 48px;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+  font-size: 14px;
+}
+/* Like a printed scale bar: ink frame, one tick per 500 points. */
+.profile-bars .track {
+  height: 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(31, 45, 77, .18) calc(10% - 1px) 10%);
+  overflow: hidden;
+}
+.profile-bars .track span {
+  display: block;
+  height: 100%;
+  width: calc(var(--share, 0) * 100%);
+  background: var(--ink);
+}
+.profile-bars .value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.profile-bars .meta { grid-column: 2 / -1; font-size: 13px; color: var(--ink-2); }
+
+.profile-countries { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
+.profile-countries h3 { font-size: 19px; }
+.profile-countries ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.profile-countries li { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
+.profile-countries .flag-img { flex: 0 0 auto; width: 26px; height: 19px; object-fit: cover; align-self: center; border: 2px solid #fbfbf6; box-shadow: 0 1px 3px rgba(20, 28, 48, .3); }
+.profile-countries .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-countries .value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.profile-countries .meta { font-size: 12px; color: var(--ink-2); min-width: 22px; text-align: right; }
+.profile-countries li.empty { font-size: 13px; color: var(--ink-2); }
+
+/* Form over time */
+.profile-form { position: relative; }
+.profile-form svg { display: block; width: 100%; height: auto; }
+.profile-form .grid { stroke: var(--rule-soft); stroke-width: 1; }
+.profile-form .axis { fill: var(--ink-2); font-size: 11px; font-family: var(--body); }
+.profile-form .bar { fill: var(--ink); }
+.profile-form .hit { fill: transparent; }
+.profile-form .hit.on { fill: rgba(31, 45, 77, .07); }
+.form-tip {
+  position: absolute;
+  top: -6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--cover);
+  font-size: 13px;
+  color: var(--cover-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+.form-tip strong { color: var(--cover-text); margin-right: 4px; }
+
+/* ---------- Chat ---------- */
+
+/* In the lobby the chat fills the left page down to the MRZ line - the
+   message list grows into the free space and the input sits fixed at the
+   bottom like in a messenger. */
+.chat-slot { flex: 1; display: flex; flex-direction: column; min-height: 240px; padding-top: 16px; border-top: 1px dashed var(--rule); }
+.chat-slot h2 { margin-bottom: 10px; font-size: 24px; }
+.chat-slot .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.chat-slot .chat-panel { flex: 1; min-height: 0; }
+.chat-slot .chat-log { flex: 1 1 0; min-height: 110px; max-height: none; }
+
+.chat-toggle { display: none; }
+.chat-panel { display: flex; flex-direction: column; gap: 10px; }
+
+.chat-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Messages sit down by the input and grow upwards - like in any messenger.
+   Using margin instead of justify-content keeps scrolling intact. */
+.chat-log > li:first-child { margin-top: auto; }
+.chat-log li { display: flex; align-items: baseline; gap: 8px; font-size: 16px; line-height: 1.4; }
+.chat-log .dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(31, 45, 77, .35);
+  transform: translateY(-1px);
+}
+.chat-text { min-width: 0; overflow-wrap: anywhere; }
+.chat-text strong { font-weight: 700; margin-right: 2px; }
+.chat-empty { font-size: 15px; color: var(--muted); }
+.nowrap { white-space: nowrap; }
+
+/* Empty lobby chat: instead of a blank area above the hint, a dashed box with
+   the hint centred in it. */
+.chat-slot .chat-panel:has(.chat-empty:not([hidden])) .chat-log { display: none; }
+.chat-slot .chat-empty:not([hidden]) {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 110px;
+  padding: 16px;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.chat-form { display: flex; gap: 8px; }
+.chat-form input { flex: 1; min-width: 0; height: 44px; }
+.chat-form .btn { flex: 0 0 auto; }
+
+/* Round results and final standings: floats bottom left over the map - above
+   the Google logo so that stays visible. */
+.chat.floating {
+  position: fixed;
+  left: 12px;
+  bottom: 34px;
+  z-index: 30;
+  width: min(340px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column-reverse;
+  /* The empty area next to the button must not block the map. */
+  pointer-events: none;
+}
+.chat.floating .chat-toggle, .chat.floating .chat-panel { pointer-events: auto; }
+.chat.floating .chat-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--cover-line);
+  border-radius: var(--radius-sm);
+  background: var(--cover);
+  color: var(--cover-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.chat.floating .chat-toggle:hover { border-color: var(--cover-muted); }
+.chat.floating .chat-panel { display: none; }
+.chat.floating.open .chat-panel {
+  display: flex;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 40px -12px rgba(5, 10, 24, .6);
+}
+.chat.floating .chat-log { max-height: 240px; }
+.chat.floating .chat-form input { height: 40px; }
+/* When open the button sits below the window - closer to the thumb, and the
+   window grows upwards away from it. */
+.chat.floating.open .chat-panel { margin: 0 0 8px; }
+.chat.floating .chat-toggle { align-self: flex-start; }
+
+.chat-badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Confetti ---------- */
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 50;
+  transform: translateX(-50%);
+  max-width: min(90vw, 440px);
+  padding: 12px 18px;
+  background: var(--red);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+/* Tone down the Google branding a little so it doesn't catch the eye */
+.gm-style-cc, .gmnoprint a { opacity: .55; }
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 1100px) {
+  /* Between tablet and desktop the spread gets tight - the stamp moves closer
+     to the edge, the pages get less padding. */
+  .lobby-wrap { padding-inline: 24px; }
+  .page { padding: 26px 26px 22px; }
+  .code-stamp { right: 20px; }
+  .page > h2, .panel-note { margin-right: 170px; }
+  .code-badge { font-size: 44px; }
+}
+
+@media (max-width: 760px) {
+  /* The spread folds into a single page - the fold becomes the line between
+     the two halves. */
+  /* The passport lies as a single page, the inside of the cover slides
+     underneath. The cover swings out of view on opening. */
+  #screen-home { padding: 20px 16px 32px; align-content: start; }
+  .passport { --pw: min(440px, calc(100vw - 32px)); grid-template-columns: var(--pw); transform: none; }
+  .pp-inner { grid-column: 1; grid-row: 2; margin-top: 14px; padding: 22px 22px 20px; border-radius: 14px; gap: 16px; }
+  .pp-inner::after { display: none; }
+  .passport:not(.settled) .pp-inner { display: none; }
+  .pp-data, .pp-cover { grid-column: 1; }
+  .passport.open .pp-cover { opacity: 0; transition: transform var(--turn) var(--turn-ease), opacity .3s ease .45s; }
+  .home-card { min-height: min(calc(var(--pw) * 1.42), calc(100dvh - 110px)); }
+  .pp-emblem { display: none; }
+  .pp-claim { font-size: 28px; }
+  .home-card { padding-block: 16px 12px; padding-inline: 18px; }
+  .dp-id { gap: 14px; }
+  #home-photo .photo { width: 76px; height: 92px; }
+  .home-stamp { top: 104px; right: 14px; }
+  .brand { font-size: 40px; }
+  .lobby-wrap { padding: 16px 12px 16px; gap: 14px; }
+  .lobby-brand { font-size: 24px; }
+  .lobby-head-actions { flex: 1 0 100%; flex-wrap: wrap; }
+  .share-link { flex: 1 0 100%; max-width: none; }
+  .lobby-head-actions .btn { padding: 0 11px; }
+  .share-note { text-align: left; }
+  .spread { grid-template-columns: 1fr; }
+  .spread::before { display: none; }
+  .spread > .page + .page { border-top: 2px solid #c4d1c4; }
+  .page { padding: 22px 18px 20px; }
+  .page h2 { font-size: 28px; }
+  /* The stamp flows along at the top right instead of sitting over the text. */
+  .code-stamp { position: relative; top: auto; right: auto; float: right; margin: -6px -2px 10px 12px; padding: 4px 12px 3px; }
+  .code-stamp-label { font-size: 13px; }
+  .code-badge { font-size: 40px; }
+  .page > h2, .panel-note { margin-right: 0; }
+  .mode-switch { clear: both; }
+  .settings-row { grid-template-columns: 1fr; }
+  .mode-switch button em { font-size: 13px; }
+  .lobby-foot { flex-wrap: wrap; }
+  .lobby-foot-text { flex: 1 0 100%; }
+  .lobby-foot #start-hint { font-size: 15px; }
+  .lobby-foot .btn { flex: 1; min-width: 0; }
+  .lobby-foot #btn-start { height: 54px; }
+  .chat-slot { min-height: 260px; }
+
+  .guess-box {
+    left: 14px;
+    right: 14px;
+    width: auto;
+  }
+  .guess-box:hover { width: auto; }
+  .guess-box.pinned { width: auto; }
+  .guess-box.resizing { width: auto; }
+  .guess-map { height: 34vh; }
+  .guess-box:hover .guess-map { height: 34vh; }
+  .guess-box.pinned .guess-map,
+  .guess-box.resizing .guess-map { height: min(var(--guess-h), calc(100vh - 190px)); }
+
+  .hud { height: auto; padding: 8px 10px; flex-wrap: wrap; }
+  .hud-spacer { display: none; }
+  .hud-players { justify-content: flex-start; }
+
+  .reveal-layout { flex-direction: column; }
+  .reveal-map { flex: 0 0 38%; }
+  .reveal-side { width: auto; flex: 1; padding: 18px 18px 16px; gap: 10px; box-shadow: 0 -10px 30px rgba(5, 10, 24, .25); }
+  .entry-stamp { margin: 2px 0 4px; }
+  .entry-stamp-inner { padding: 8px 16px 7px; }
+  #reveal-place { font-size: clamp(24px, calc(460px / var(--len, 10)), 42px); }
+  .entry-stamp-sub { font-size: 16px; }
+
+  .final-layout { flex-direction: column; }
+  .final-map-wrap { flex: 0 0 38%; --pip-w: min(44%, 200px); --pip-h: min(44%, 130px); }
+  .final-side { width: auto; flex: 1; padding: 18px 18px 16px; gap: 10px; box-shadow: 0 -10px 30px rgba(5, 10, 24, .25); }
+  .final-title { font-size: 28px; }
+  .win-stamp-name { font-size: 36px; }
+
+  .hall-records { grid-template-columns: 1fr; gap: 12px; padding: 0 4px; }
+  .final-place { max-width: 190px; }
+
+  .stats-overlay { padding: 10px; }
+  .stats-card { padding: 16px; gap: 12px; }
+  .stats-card h2 { font-size: 28px; }
+  .stats-table { font-size: 13px; }
+  .stats-table th, .stats-table td { padding: 7px 9px; }
+
+  .profile-grid { grid-template-columns: 1fr; }
+  .profile-dp .dp-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-dp .photo { width: 70px; height: 86px; }
+  .profile-dp .dp-id { gap: 14px; }
+  .hall-head-actions .btn { padding: 6px 10px; }
+
+  /* On phones the map is on top: top right is free, top left holds the round
+     filter and place name, bottom the logo and zoom. */
+  .chat.floating { left: auto; right: 12px; bottom: auto; top: 12px; }
+  .chat.floating .chat-toggle { align-self: flex-end; }
+  .chat.floating { flex-direction: column; }
+  .chat.floating.open .chat-panel { margin: 8px 0 0; }
+  .chat.floating .chat-log { max-height: 180px; }
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown-num.pop,
+  .brand, .brand-sub, .home-stamp.on,
+  .hall-records .hall-record,
+  .player-list li.arrive,
+  .result-list li, .result-list .pts .stamp,
+  .podium li, .podium li .title-stamp,
+  .win-stamp.press, .final-side.thud,
+  .stamp.press { animation: none !important; }
+  .passport, .pp-cover, .pp-inner > * { transition: none !important; }
+  .home-stamp.on { opacity: 1; }
+  .btn, .swatch, .guess-box, .guess-map, .guess-resize, .mode-switch button, .hp > span { transition: none; }
+}
+
+/* ---------- Language choice ---------- */
+/* The language row at the bottom of the inner cover: the active language
+   plain and bold, the others as underlined links. Switching reloads the page
+   (see i18n/index.ts). */
+.lang-pick {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  font: 600 12px var(--body);
+  letter-spacing: .04em;
+  color: var(--ink-2);
+}
+.lang-pick .on { color: var(--ink); font-weight: 700; }
+.lang-pick .sep { color: var(--ink-2); }
+.lang-pick button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.lang-pick button:hover { color: var(--ink); }
+.lang-pick button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+
+/* ---------- Jukebox ---------- */
+/* A plain list page for listening through the music; see jukebox.html. */
+.jb { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; overflow: auto; }
+.jb h1 { font-size: 44px; margin-bottom: 4px; }
+.jb h2 { font-size: 24px; margin: 28px 0 10px; }
+.jb p { color: var(--muted); margin: 0 0 8px; }
+.jb .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.jb button {
+  font: 600 15px var(--body); color: var(--ink); background: var(--paper-raise);
+  border: 1.5px solid var(--ink); border-radius: 6px; padding: 8px 12px; cursor: pointer;
+}
+.jb button:hover { background: var(--paper-sink); }
+.jb button.on { background: var(--ink); color: var(--paper); }
+.jb .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.jb .grid button { text-align: left; display: flex; gap: 8px; align-items: baseline; }
+.jb .code { font: 14px 'Space Mono', monospace; min-width: 2.2em; }
+.jb .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jb .now { font: 14px 'Space Mono', monospace; margin-top: 12px; min-height: 1.4em; }
