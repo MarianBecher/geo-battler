@@ -2392,6 +2392,73 @@ input::placeholder { color: #6a768e; }
 /* Tone down the Google branding a little so it doesn't catch the eye */
 .gm-style-cc, .gmnoprint a { opacity: .55; }
 
+/* ---------- Lobby on a desktop: exactly one window high ---------- */
+/* The passport fills the space between header and footer instead of making
+   the page scroll. The chat gives way on the left (its log scrolls anyway),
+   on the right only the votes scroll - mode and settings stay in view. Below
+   a sensible height the whole page scrolls again. */
+
+@media (min-width: 761px) and (min-height: 540px) {
+  #screen-lobby { overflow: hidden; }
+  .lobby-wrap { height: 100%; min-height: 0; }
+  .spread { min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .lobby-col, .spread > .page:last-child { min-height: 0; }
+  .lobby-col { overflow: hidden; }
+  /* Many travellers: their list scrolls, the chat keeps enough to write in. */
+  .lobby-col > .panel:first-child { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .lobby-col > .panel:first-child > * { flex: none; }
+  /* The padding gives the tilted photos room - they reach past their row. */
+  .lobby-col > .panel:first-child > .player-list {
+    flex: 0 1 auto;
+    min-height: 76px;
+    margin-block: -6px;
+    padding-block: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .chat-slot { flex: 1 0 0; min-height: 150px; }
+  .chat-slot .chat-log { min-height: 48px; }
+  .chat-slot .chat-empty:not([hidden]) { min-height: 48px; padding: 8px; }
+
+  .spread > .page:last-child { display: flex; flex-direction: column; }
+  .spread > .page:last-child > * { flex: none; }
+  .spread > .page:last-child > .toggles {
+    flex: 0 1 auto;
+    min-height: 90px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    border-bottom: 1px dashed var(--rule);
+  }
+  /* The last card's rule would double the one of the scroll box. */
+  .spread > .page:last-child > .toggles .vote-card:last-child { border-bottom: 0; }
+}
+
+/* Laptop heights: tighter all round, so there is room for the votes. */
+@media (min-width: 761px) and (max-height: 1000px) {
+  .lobby-wrap { padding-block: 12px; gap: 12px; }
+  .page { padding: 22px 34px 18px; }
+  .page h2 { font-size: 28px; }
+  .code-stamp { top: 14px; }
+  .mode-switch { margin-top: 14px; }
+  .lobby-col { gap: 12px; }
+  .lobby-col h2 { margin-bottom: 8px; }
+  .chat-slot { padding-top: 10px; }
+  .chat-slot h2 { margin-bottom: 6px; font-size: 22px; }
+  .toggles { margin-top: 12px; }
+  .vote-head { padding: 7px 0 5px; }
+  .vote-body { padding-bottom: 8px; }
+}
+
+/* Very low windows (a laptop at 150 %): decoration and hints make way. */
+@media (min-width: 761px) and (max-height: 700px) {
+  .share-note, .mrz, .mode-switch button em { display: none; }
+  .lobby-col { gap: 8px; }
+  .player-list li { min-height: 48px; }
+  .lobby-foot .btn-lg { height: 48px; }
+}
+
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 1100px) {
