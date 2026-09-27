@@ -71,7 +71,15 @@ function audio(): Engine | null {
   const ctx = new AudioContext();
   const master = ctx.createGain();
   master.gain.value = 0.9;
-  master.connect(ctx.destination);
+  // Catches the peaks when drums, effects and the orchestra pile up (the
+  // last seconds of a round) - below the threshold it does nothing.
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -6;
+  limiter.knee.value = 6;
+  limiter.ratio.value = 8;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.25;
+  master.connect(limiter).connect(ctx.destination);
   attachSynth(ctx, master);
 
   const orch = new Orchestra(ctx, { baseUrl: 'audio/samples/', destination: master });
