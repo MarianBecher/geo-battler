@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { INSTRUMENT_NAMES, type Score } from 'tiny-orchestra';
+import { INSTRUMENT_NAMES, toMidi, type Score } from 'tiny-orchestra';
 import type { Anthem } from 'anthem-scores';
-import { anthemScore, cadenceScore, chord, dominantOf, HOME_KEY, lobbyTheme, midi, travelTheme } from '../src/audio/music.ts';
+import { anthemScore, cadenceScore, chord, dominantOf, GAME_BARS, GAME_CHORDS, HOME_KEY, lobbyTheme, midi, PRESSURE_BUILD_BARS, pressureLayer, travelTheme } from '../src/audio/music.ts';
 
 /** A score tiny-orchestra can play: known instruments, sane notes inside the length. */
 function expectValid(score: Score): void {
@@ -15,6 +15,7 @@ function expectValid(score: Score): void {
       expect(beat).toBeLessThan(length);
       expect(len).toBeGreaterThan(0);
       if (pitch !== null) {
+        expect(typeof pitch).toBe('number'); // our scores write MIDI numbers, never note names
         expect(Number.isInteger(pitch)).toBe(true);
         expect(pitch).toBeGreaterThanOrEqual(21);
         expect(pitch).toBeLessThanOrEqual(108);
@@ -74,6 +75,57 @@ describe('themes', () => {
     expectValid(score);
     expect(score.beatsPerBar).toBe(4);
     expect(score.lengthBeats).toBe(2 * 16 * 4);
+  });
+
+  it('builds a valid pressure layer over one pass of the travel theme', () => {
+    const score = pressureLayer();
+    expectValid(score);
+    expect(score.bpm).toBe(travelTheme().bpm);
+    expect(score.lengthBeats).toBe(GAME_BARS * 4);
+  });
+
+  it('follows the harmony of the travel theme from any bar on', () => {
+    const celliBass = (score: ReturnType<typeof pressureLayer>, bar: number) =>
+      toMidi(score.parts.find((p) => p.instrument === 'celli')?.notes.find(([beat]) => beat === bar * 4)?.[1]);
+    // Bar 3 of the theme is Gmaj7 - entering there, the layer starts on G.
+    expect(celliBass(pressureLayer(3), 0)! % 12).toBe(7);
+    expect(celliBass(pressureLayer(0), 3)).toBe(celliBass(pressureLayer(3), 0));
+  });
+
+  it('plays only tones of the chord of each bar, from any bar on', () => {
+    // Nothing may grind against the travel theme underneath.
+    for (const start of [0, 1, 5, 13]) {
+      for (const part of pressureLayer(start).parts) {
+        for (const [beat, pitch] of part.notes) {
+          if (pitch === null) continue;
+          const { pcs, bass } = chord(GAME_CHORDS[(start + Math.floor(beat / 4)) % GAME_BARS]!);
+          expect([...pcs, bass], `${part.instrument} at beat ${beat}`).toContain(toMidi(pitch)! % 12);
+        }
+      }
+    }
+  });
+
+  it('plays every stage harder than the one before', () => {
+    const stageLen = PRESSURE_BUILD_BARS * 4;
+    const celli = pressureLayer().parts.find((p) => p.instrument === 'celli')?.notes ?? [];
+    const mean = (stage: number): number => {
+      const v = celli.filter(([beat]) => Math.floor(beat / stageLen) === stage).map((n) => n[3]!);
+      return v.reduce((a, b) => a + b, 0) / v.length;
+    };
+    expect(mean(1)).toBeGreaterThan(mean(0));
+    expect(mean(2)).toBeGreaterThan(mean(1));
+  });
+
+  it('carries the motif of the themes in the horns: third, fifth, root', () => {
+    const horn = pressureLayer().parts.find((p) => p.instrument === 'horn')?.notes ?? [];
+    // Bar 1 of the theme is Dadd9: F# - A - D, upwards.
+    expect(horn.filter(([beat]) => beat < 4).map(([, pitch]) => toMidi(pitch))).toEqual([midi('F#4'), midi('A4'), midi('D5')]);
+  });
+
+  it('brings the snare in only after the build-up', () => {
+    const snare = pressureLayer().parts.find((p) => p.instrument === 'snare')?.notes ?? [];
+    expect(snare.length).toBeGreaterThan(0);
+    for (const [beat] of snare) expect(beat).toBeGreaterThanOrEqual(PRESSURE_BUILD_BARS * 4);
   });
 
   it('builds a valid cadence', () => {

@@ -292,6 +292,7 @@ loaded, small synth effects fill in.
 | --- | --- |
 | Home, lobby | travel waltz: harp and pizzicato, flute on top, oboe on the second pass |
 | Guessing | wide string pads, rippling harp, motif fragments in oboe and horn |
+| Last 30 s of a round | a call to attention of crash, bass drum and brass, then the guessing theme steps back for driving strings, timpani, drums and the motif of both themes in the horns - growing in three stages until the trumpets take it up as time runs out |
 | Reveal | timpani roll, the entry stamp lands, then a dominant chord leads into the **national anthem of the country**, then the waltz returns |
 | Final | silence first so the fanfare stands alone, then the waltz again |
 

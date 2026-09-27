@@ -150,6 +150,7 @@ export function startRound(msg: RoundMessage, show: () => void): void {
   $('hud-watch').hidden = !state.spectating;
   if (state.spectating && msg.pins) showOthersPins(msg.round, msg.pins);
 
+  sfx.hurry(null); // a new round starts calm, even if the last one ended in a hurry
   startCountdown(msg);
   timerEndsAt = msg.endsAt;
   startTimer(msg.endsAt, msg.startsAt);
@@ -225,6 +226,8 @@ export const inCountdown = (): boolean => countdownHandle !== null;
 
 let timerHandle: ReturnType<typeof setInterval> | null = null;
 let timerEndsAt: number | null = null;
+/** Seconds before the end at which the music turns urgent (sound.hurry). */
+const HURRY_S = 30;
 
 function startTimer(endsAt: number | null, startsAt: number | null): void {
   stopTimer();
@@ -239,6 +242,8 @@ function startTimer(endsAt: number | null, startsAt: number | null): void {
   let tickedSecond: number | null = null;
   // During the countdown the full round time is shown, not more.
   const full = startsAt ? endsAt - startsAt : Infinity;
+  // From here on the music gets urgent - in short rounds only for the second half.
+  const hurryFrom = Math.min(HURRY_S, full / 2000);
 
   const tick = (): void => {
     const left = Math.min(full, Math.max(0, endsAt - serverNow()));
@@ -249,6 +254,7 @@ function startTimer(endsAt: number | null, startsAt: number | null): void {
       tickedSecond = secs;
       if (secs > 0 && secs <= 10) sfx.play('tick', secs <= 3);
     }
+    if (left > 0 && left <= (hurryFrom + sfx.HURRY_LOOKAHEAD_S) * 1000) sfx.hurry(left / 1000, hurryFrom);
     if (left <= 0) stopTimer();
   };
   tick();
@@ -271,6 +277,7 @@ export function syncPause(): void {
   $('btn-pause').hidden = !(isHost() && playing && !room.paused && !inCountdown());
   if (playing && room.paused) {
     stopTimer();
+    sfx.hurry(null); // the pause takes the pressure off; the timer brings it back
     timerEndsAt = null;
   } else if (playing && room.roundEndsAt !== timerEndsAt) {
     timerEndsAt = room.roundEndsAt;

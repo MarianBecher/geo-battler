@@ -52,11 +52,42 @@ function markMood(mood: string | null): void {
   for (const b of document.querySelectorAll<HTMLElement>('[data-mood]')) b.classList.toggle('on', b.dataset.mood === mood);
 }
 
+// The end of a round, played through: the travel theme, the
+// pressure layer growing towards zero, the ticks of the last ten seconds.
+const HURRY_S = 30;
+let hurryHandle: ReturnType<typeof setInterval> | undefined;
+
+function stopHurry(): void {
+  clearInterval(hurryHandle);
+  hurryHandle = undefined;
+  sfx.hurry(null);
+}
+
+function startHurry(): void {
+  stopHurry();
+  const endsAt = performance.now() + (HURRY_S + sfx.HURRY_LOOKAHEAD_S) * 1000;
+  let ticked: number | null = null;
+  hurryHandle = setInterval(() => {
+    const left = (endsAt - performance.now()) / 1000;
+    if (left <= 0) {
+      stopHurry();
+      return;
+    }
+    const secs = Math.ceil(left);
+    if (secs !== ticked && secs <= 10) sfx.play('tick', secs <= 3);
+    ticked = secs;
+    sfx.hurry(left, HURRY_S);
+  }, 250);
+}
+
 $('moods').addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-mood]');
   if (!b) return;
   const mood = b.dataset.mood;
-  sfx.setMood(mood === 'lobby' || mood === 'game' ? mood : null);
+  stopHurry();
+  const next = mood === 'hurry' ? 'game' : mood;
+  sfx.setMood(next === 'lobby' || next === 'game' ? next : null);
+  if (mood === 'hurry') startHurry();
   markMood(mood ?? null);
   say(mood ? t('jukebox.theme', { name: b.textContent }) : t('jukebox.silence'));
 });
@@ -75,6 +106,7 @@ $('fx').addEventListener('click', (e) => {
 });
 
 function arrive(code: string, label: string): void {
+  stopHurry();
   // As in the game: first out of the current mood, then into the reveal.
   sfx.setMood(null);
   sfx.setMood('reveal');

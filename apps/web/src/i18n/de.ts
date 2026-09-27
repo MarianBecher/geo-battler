@@ -626,6 +626,7 @@ export const de: Dictionary = {
   'jukebox.themes': 'Themen',
   'jukebox.theme.lobby': 'Lobby · Reisewalzer',
   'jukebox.theme.game': 'Raten · unterwegs',
+  'jukebox.theme.hurry': 'Raten · letzte 30 Sekunden',
   'jukebox.silence': 'Stille',
   'jukebox.effects': 'Effekte',
   'jukebox.anthems': 'Ankunft & Hymnen',

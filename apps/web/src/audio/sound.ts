@@ -295,9 +295,70 @@ function fadeOut(part: Playing | null, seconds: number): void {
 }
 
 function stopTheme(seconds = 0.9): void {
+  stopPressure(seconds);
   fadeOut(theme, seconds);
   theme = null;
 }
+
+// --- Time pressure -------------------------------------------------------------
+//
+// In the last seconds of a round a second performance joins the travel
+// theme: driving strings, a heartbeat, the timpani (music.pressureLayer).
+// It comes in on the theme's next bar line so both stay in step, starts
+// quietly and grows to its full level exactly when time runs out.
+
+let pressure: Playing | null = null;
+// Bus level of the layer at its entry and when time runs out. It starts well
+// below its end, so the thirty seconds keep growing; the stages add their
+// own crescendo on top (music.pressureLayer).
+const PRESSURE_FROM = 1.1;
+const PRESSURE_TO = 2.6;
+// Meanwhile the calm theme steps back, and harp and glockenspiel leave it
+// entirely - they should not idyllically carry on over the drums.
+const THEME_DUCK = 0.3;
+const CALM_INSTRUMENTS: readonly InstrumentName[] = ['harp', 'glockenspiel'];
+
+/** Fade the calm parts of the running theme to `gain`. */
+function fadeCalm(gain: number, seconds: number): void {
+  if (!theme?.perf) return;
+  scoreOf(theme.name).parts.forEach((p, i) => {
+    if (CALM_INSTRUMENTS.includes(p.instrument)) theme?.perf?.part(i)?.fade(gain, seconds);
+  });
+}
+
+function stopPressure(seconds = 0.9): void {
+  if (!pressure) return;
+  fadeOut(pressure, seconds);
+  pressure = null;
+  if (theme) theme.bus.fade(theme.level, seconds);
+  fadeCalm(1, seconds);
+}
+
+function startPressure(secondsLeft: number, from: number): void {
+  if (pressure || !engine || !theme?.perf || theme.name !== 'game') return;
+  const { ctx, orch } = engine;
+  const perf = theme.perf;
+  // The next bar line of the running theme - at least a moment ahead, so
+  // the scheduler still gets the downbeat. The theme keeps its tempo, so
+  // the bar number follows from the time.
+  const at = perf.nextBar(ctx.currentTime + 0.15);
+  const bar = Math.round((at - perf.startTime) / (perf.beatsPerBar * 60 / perf.bpm));
+  // Not before `from` seconds are left - the entry blow marks exactly that moment.
+  if (secondsLeft - (at - ctx.currentTime) > from) return;
+  const score = music.pressureLayer(bar % music.GAME_BARS);
+  if (!score.parts.every((p) => !p.notes.length || orch.has(p.instrument))) return;
+
+  const lead = Math.max(0.2, at - ctx.currentTime);
+  const bus = orch.bus({ gain: 0, reverb: 0.25 });
+  bus.fade(PRESSURE_FROM, lead);
+  theme.bus.fade(theme.level * THEME_DUCK, lead + 1);
+  fadeCalm(0, lead + 1);
+  // The crescendo: from the entry up to the end of the round.
+  const rise = Math.max(1, secondsLeft - lead);
+  setTimeout(() => { if (pressure?.bus === bus) bus.fade(PRESSURE_TO, rise); }, lead * 1000);
+  pressure = { perf: orch.play(score, { at, out: bus, loop: true }), bus };
+}
+
 
 function stopAnthem(seconds = 1.2): void {
   arrival++; // an anthem that is still loading should not come in afterwards
@@ -474,6 +535,34 @@ export function setMood(next: Mood | null): void {
     return;
   }
   playTheme(next);
+}
+
+/**
+ * How much earlier than `from` to start calling `hurry`: the layer enters on
+ * the first bar line of the theme within the last `from` seconds, and a bar
+ * lasts about 3.6 s - called only at `from`, the blow would come up to a bar late.
+ */
+export const HURRY_LOOKAHEAD_S = 4;
+
+/**
+ * Time is running out: `secondsLeft` until the round ends, or `null` when
+ * the pressure is off again (pause, new round). The layer comes in on the
+ * first bar line with at most `from` seconds left. The timer calls this on
+ * every tick - once the layer runs, further calls change nothing, and when
+ * its instruments are not loaded yet, a later call tries again.
+ */
+export function hurry(secondsLeft: number | null, from = 30): void {
+  if (secondsLeft === null) {
+    stopPressure(1.5);
+    return;
+  }
+  // At zero it keeps going: the switch to the reveal ends it, right into the timpani roll.
+  if (secondsLeft <= 0 || !musicWanted() || mood !== 'game') return;
+  try {
+    startPressure(secondsLeft, from);
+  } catch (err) {
+    console.warn('[sound]', err);
+  }
 }
 
 /** Samples loaded? Until then only the synth effects sound. */

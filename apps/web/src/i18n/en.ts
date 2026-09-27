@@ -626,6 +626,7 @@ export const en = {
   'jukebox.themes': 'Themes',
   'jukebox.theme.lobby': 'Lobby · travel waltz',
   'jukebox.theme.game': 'Guessing · on the road',
+  'jukebox.theme.hurry': 'Guessing · last 30 seconds',
   'jukebox.silence': 'Silence',
   'jukebox.effects': 'Effects',
   'jukebox.anthems': 'Arrival & anthems',
