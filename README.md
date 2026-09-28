@@ -1,6 +1,7 @@
 # Geo Battle
 
 [![CI](https://github.com/MarianBecher/geo-battler/actions/workflows/ci.yml/badge.svg)](https://github.com/MarianBecher/geo-battler/actions/workflows/ci.yml)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-d97757)](https://claude.com/claude-code)
 
 A GeoGuessr-style party game for your own network: one local server,
 everyone joins with a room code, and the rounds run in real time over
@@ -420,6 +421,12 @@ tools can still cheat - against friends at the same table this is enough.
 * Disconnected players keep their seat for two minutes; empty rooms are
   cleaned up after ten; max. 16 players per room.
 * No HTTPS. Fine on the LAN, do not run it on the internet.
+
+## How this was made
+
+The code, tests and docs were written by Claude (Anthropic) with Claude
+Code, directed and reviewed by me. CI runs the checks and the build on every
+push.
 
 ## License and credits
 
