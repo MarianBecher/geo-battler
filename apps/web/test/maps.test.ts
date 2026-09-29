@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDistance } from '../src/maps/google.ts';
+import { formatDistance, worldZoom } from '../src/maps/google.ts';
 import { naturalEarth } from '../src/maps/projection.ts';
 import { inkLabel, inkOf, INKS, project } from '../src/maps/worldmap.ts';
 
@@ -22,6 +22,20 @@ describe('formatDistance', () => {
   it('rounds and groups from 100 km on', () => {
     expect(formatDistance(100)).toBe('100 km');
     expect(formatDistance(1234.4)).toBe('1,234 km');
+  });
+});
+
+describe('worldZoom', () => {
+  it('stays at zoom 1 for small maps', () => {
+    expect(worldZoom(310)).toBe(1);
+    expect(worldZoom(720)).toBe(1);
+    expect(worldZoom(0)).toBe(1);
+  });
+
+  it('zooms in as the map is dragged larger', () => {
+    expect(worldZoom(1000)).toBe(2);
+    expect(worldZoom(1400)).toBe(2);
+    expect(worldZoom(1900)).toBe(3);
   });
 });
 

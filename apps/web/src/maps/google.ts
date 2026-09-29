@@ -169,6 +169,17 @@ const PASSPORT_MAP_STYLE: google.maps.MapTypeStyle[] = [
 const WORLD_CENTER: LatLng = { lat: 20, lng: 5 };
 const WORLD_ZOOM = 1;
 
+/**
+ * The zoom at which the world roughly fills a map `width` pixels wide - at
+ * most about 1.4 copies side by side. A fixed zoom repeats the world three or
+ * four times over on a map dragged large.
+ */
+export function worldZoom(width: number): number {
+  if (!(width > 0)) return WORLD_ZOOM;
+  // At zoom z the world is 256 * 2^z pixels wide.
+  return Math.max(WORLD_ZOOM, Math.round(Math.log2(width / 256)));
+}
+
 const WORLD_MAP_OPTIONS: google.maps.MapOptions = {
   center: WORLD_CENTER,
   zoom: WORLD_ZOOM,
@@ -493,13 +504,20 @@ export class GuessMap {
   /** playerId -> marker: the others' pins (spectators only). */
   private readonly others = new Map<string, Marker>();
   tele: MapTelemetry = emptyMapTelemetry();
+  /** Still the world view from the start of the round - then it follows the map's size. */
+  private untouched = true;
+  /** While the map sets its own view, that is not the player zooming. */
+  private fitting = false;
 
-  constructor(el: HTMLElement, onPick: (pos: LatLng) => void) {
+  constructor(private readonly el: HTMLElement, onPick: (pos: LatLng) => void) {
     this.map = new google.maps.Map(el, WORLD_MAP_OPTIONS);
 
     this.map.addListener('zoom_changed', () => {
+      if (this.fitting) return;
+      this.untouched = false;
       this.tele.mapZoomMax = Math.max(this.tele.mapZoomMax, this.map.getZoom() ?? 0);
     });
+    this.map.addListener('dragstart', () => { this.untouched = false; });
 
     // The map stays open for the whole round - even after submitting, the
     // pin can still be moved.
@@ -565,13 +583,21 @@ export class GuessMap {
       this.marker = null;
     }
     this.clearOthers();
-    this.map.setCenter(WORLD_CENTER);
-    this.map.setZoom(WORLD_ZOOM);
+    this.untouched = true;
+    this.showWorld();
   }
 
   /** After the container is expanded or collapsed the API has to measure again. */
   refresh(): void {
     google.maps.event.trigger(this.map, 'resize');
+    if (this.untouched) this.showWorld();
+  }
+
+  private showWorld(): void {
+    this.fitting = true;
+    this.map.setCenter(WORLD_CENTER);
+    this.map.setZoom(worldZoom(this.el.clientWidth));
+    this.fitting = false;
   }
 }
 
