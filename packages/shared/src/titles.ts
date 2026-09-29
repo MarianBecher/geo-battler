@@ -8,7 +8,7 @@ export const TITLE_GROUPS = {
   geography: ['antipode', 'aroundTheWorld', 'continentalDrift', 'seafarer', 'homebody',
     'regular', 'dejaVu', 'polarExplorer', 'tropical', 'homeAdvantage', 'blindSpot', 'shadow',
     'loneWolf', 'northernLight', 'southerner', 'eastward', 'westward'],
-  map: ['luckyGuess', 'homingIn', 'oneClickWonder', 'anchor', 'undecided', 'changeOfHeart', 'gutFeeling'],
+  map: ['luckyGuess', 'homingIn', 'oneClickWonder', 'anchor', 'undecided', 'changeOfHeart', 'coldFeet', 'gutFeeling'],
   timing: ['snapDecision', 'efficiency', 'metronome', 'lastSecond', 'ponderer', 'warmUp',
     'firstOne', 'straggler', 'ghost'],
   streetview: ['explorer', 'marathon', 'lost', 'returner', 'homebodyPano', 'detective',
@@ -76,6 +76,9 @@ export interface FactParams {
   firstToLastPin: { km: number };
   maxPins: { n: number };
   gutFeelingRounds: { n: number };
+  closestPin: { km: number };
+  submittedOff: { km: number };
+  pointsLetGo: { points: number };
   avgSubmitAfter: { ms: number };
   fastestSubmit: { ms: number };
   pointsPerSecond: { points: number };
@@ -115,7 +118,7 @@ export const METRIC_KEYS = [
   'score', 'avgPoints', 'bestRoundPoints', 'pointsSpread', 'roundWins',
   'avgDistanceKm', 'bestDistanceKm', 'worstDistanceKm', 'continentHits', 'missed',
   'avgConfirmMs', 'fastestConfirmMs', 'firstConfirms',
-  'avgPins', 'maxPins', 'avgPinPathKm', 'avgMoveKm', 'fineTuneRounds',
+  'avgPins', 'maxPins', 'avgPinPathKm', 'avgMoveKm', 'fineTuneRounds', 'pointsLetGo',
   'panoStepsTotal', 'panoStepsAvg', 'panDegAvg', 'zoomMaxAvg', 'mapZoomMaxAvg',
   'guessSpreadKm', 'biasLat', 'biasLng',
 ] as const;

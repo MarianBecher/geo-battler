@@ -24,6 +24,8 @@ export interface RoundStat {
   lastAdjustKm: number | null;
   /** Distance from the first to the last pin. */
   moveKm: number;
+  /** The closest any pin of the round came to the target. */
+  closestPinKm: number | null;
   confirmMs: number | null;
   /** 1 = submitted first. */
   confirmRank: number | null;
@@ -41,7 +43,7 @@ export function emptyTelemetry(): Telemetry {
 export function emptyRoundStat(round: number): RoundStat {
   return {
     round, points: 0, distanceKm: null, guess: null, pins: 0, pinPathKm: 0,
-    firstPin: null, firstPinMs: null, lastPin: null, lastPinMs: null, lastAdjustKm: null, moveKm: 0,
+    firstPin: null, firstPinMs: null, lastPin: null, lastPinMs: null, lastAdjustKm: null, moveKm: 0, closestPinKm: null,
     confirmMs: null, confirmRank: null, continentHit: null, guessContinent: null, bias: null,
     tele: emptyTelemetry(),
   };
@@ -64,8 +66,12 @@ export function sanitizeTelemetry(raw: unknown): Telemetry {
 }
 
 /** Every pin placed - including corrections, those are the interesting ones. */
-export function recordPin(stat: RoundStat, pin: LatLng, elapsedMs: number): void {
+export function recordPin(stat: RoundStat, pin: LatLng, elapsedMs: number, actual: LatLng | null): void {
   const point = { lat: pin.lat, lng: pin.lng };
+  if (actual) {
+    const off = distanceKm(point, actual);
+    stat.closestPinKm = stat.closestPinKm === null ? off : Math.min(stat.closestPinKm, off);
+  }
   if (stat.lastPin) {
     const step = distanceKm(stat.lastPin, point);
     stat.pinPathKm += step;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TITLE_IDS } from '@geo-battler/shared';
+import { scoreGuess, TITLE_IDS } from '@geo-battler/shared';
 import { buildFinalStats, type PlayerEntry } from '../src/titles.ts';
 import { emptyRoundStat, closeRoundStat, recordPin } from '../src/stats.ts';
 
@@ -11,12 +11,11 @@ function entry(playerId: string, guesses: ({ lat: number; lng: number } | null)[
     const stat = emptyRoundStat(i + 1);
     const actual = actuals[i]!;
     if (guess) {
-      recordPin(stat, guess, 5000 + i * 1000);
+      recordPin(stat, guess, 5000 + i * 1000, actual);
       stat.confirmMs = 10000 + i * 1000;
       stat.confirmRank = 1;
     }
-    const distance = guess ? Math.hypot(guess.lat - actual.lat, guess.lng - actual.lng) * 111 : null;
-    const points = guess ? Math.max(0, Math.round(5000 * Math.exp((-10 * distance!) / 14916.862))) : 0;
+    const { distanceKm: distance, points } = guess ? scoreGuess(guess, actual) : { distanceKm: null, points: 0 };
     closeRoundStat(stat, { guess, actual, distance, points });
     score += points;
     return stat;
@@ -61,6 +60,24 @@ describe('buildFinalStats', () => {
     expect(pins.values.every((v) => !v.best)).toBe(true);
     const missed = metrics.find((m) => m.key === 'missed')!;
     expect(missed.values.find((v) => v.playerId === 'bob')!.value).toBe(1);
+  });
+
+  it('awards Cold Feet to whoever moves a close pin far away', () => {
+    const target = [spot(52.5, 13.4)];
+    const stat = emptyRoundStat(1);
+    recordPin(stat, spot(52.6, 13.5), 4000, target[0]!); // Berlin, a few km off
+    recordPin(stat, spot(40.4, -3.7), 8000, target[0]!); // ... and then Madrid
+    const { distanceKm: distance, points } = scoreGuess(spot(40.4, -3.7), target[0]!);
+    closeRoundStat(stat, { guess: spot(40.4, -3.7), actual: target[0]!, distance, points });
+    const flip: PlayerEntry = { playerId: 'flip', name: 'flip', color: '#000', score: points, rounds: [stat] };
+    const steady = entry('steady', [spot(48, 11)], target);
+
+    const { titles, metrics } = buildFinalStats([flip, steady], ctxFor([flip, steady], target), () => 0);
+    expect(titles.flip!.id).toBe('coldFeet');
+    expect(titles.flip!.facts.map((f) => f.key)).toEqual(['closestPin', 'submittedOff', 'pointsLetGo']);
+    const letGo = metrics.find((m) => m.key === 'pointsLetGo')!;
+    expect(letGo.values.find((v) => v.playerId === 'flip')!.value).toBeGreaterThan(3000);
+    expect(letGo.values.find((v) => v.playerId === 'steady')!.value).toBe(0);
   });
 
   it('falls back to a note title when nothing stands out for a lone player', () => {

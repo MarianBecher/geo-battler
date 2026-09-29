@@ -727,7 +727,7 @@ export class Room {
   setPin(playerId: string, lat: number, lng: number): void {
     const player = this.requirePlaying(playerId);
     player.pin = normalizePin(lat, lng);
-    if (player.roundStat) recordPin(player.roundStat, player.pin, this.elapsedMs());
+    if (player.roundStat) recordPin(player.roundStat, player.pin, this.elapsedMs(), this.currentLocation());
     this.events.onPins();
   }
 
@@ -743,7 +743,7 @@ export class Room {
     const player = this.requirePlaying(playerId);
     player.pin = normalizePin(lat, lng);
     if (player.roundStat) {
-      recordPin(player.roundStat, player.pin, this.elapsedMs());
+      recordPin(player.roundStat, player.pin, this.elapsedMs(), this.currentLocation());
       if (!player.confirmed) {
         player.roundStat.confirmMs = this.elapsedMs();
         player.roundStat.confirmRank = ++this.confirmCount;

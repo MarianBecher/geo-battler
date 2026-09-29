@@ -10,7 +10,7 @@
 // the metrics table carries raw numbers. The client translates and formats.
 
 import {
-  distanceKm, titleGroupOf, METRIC_KEYS,
+  distanceKm, pointsFor, titleGroupOf, METRIC_KEYS,
   type AwardedTitle, type ContinentCode, type Fact, type LatLng, type MetricDirection, type MetricKey, type MetricRow, type MetricUnit, type Settings, type TitleId,
 } from '@geo-battler/shared';
 import { continentOf } from './continents.ts';
@@ -82,6 +82,14 @@ interface RegionSummary {
   avgPoints: number;
 }
 
+/** A round in which a pin already lay close to the target - and was moved away again. */
+interface LetGo {
+  closestKm: number;
+  finalKm: number;
+  /** Points the closest pin would have earned, minus what was earned. */
+  points: number;
+}
+
 interface Rival {
   name: string;
   rounds: number;
@@ -120,6 +128,9 @@ export interface Summary {
   fineTuneRounds: number;
   anchorRounds: number;
   gutFeelingRounds: number;
+  /** The round with the most points given away by moving a close pin away. */
+  biggestLetGo: LetGo | null;
+  pointsLetGo: number;
   confirmed: number;
   avgConfirmMs: number | null;
   fastestConfirmMs: number | null;
@@ -210,6 +221,13 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
   }
   const regions: RegionSummary[] = [...byRegion].map(([code, list]) => ({ code, rounds: list.length, avgPoints: avg(list) }));
 
+  // Points the closest pin would have earned but the submitted one did not.
+  const letGos: LetGo[] = withGuess
+    .filter((r) => r.closestPinKm !== null)
+    .map((r) => ({ closestKm: r.closestPinKm!, finalKm: r.distanceKm, points: Math.max(0, pointsFor(r.closestPinKm!) - r.points) }));
+  const biggestLetGo = letGos.filter((l) => l.closestKm < 300 && l.points >= 1500)
+    .sort((a, b) => b.points - a.points)[0] ?? null;
+
   const tele = rounds.map((r) => r.tele);
 
   return {
@@ -251,6 +269,8 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     anchorRounds: rounds.filter((r) => r.pins >= 2 && r.moveKm < 50).length,
     // One click, submitted fast - and still above the player's own average.
     gutFeelingRounds: withGuess.filter((r) => r.pins === 1 && r.confirmMs !== null && r.confirmMs < 15000 && r.points > avgPoints).length,
+    biggestLetGo,
+    pointsLetGo: sum(letGos.map((l) => l.points)),
 
     confirmed: confirms.length,
     avgConfirmMs: confirms.length ? avg(confirms) : null,
@@ -453,6 +473,14 @@ const CATALOG: Title[] = [
   { id: 'changeOfHeart', weight: 1,
     test: (s) => s.played >= 2 && s.avgMoveKm > 2500,
     facts: (s) => [{ key: 'firstToLastPin', km: s.avgMoveKm }] },
+  // Had it under 300 km and still moved on - at least 1,500 points given away.
+  { id: 'coldFeet', weight: 4,
+    test: (s) => s.biggestLetGo !== null,
+    facts: (s) => [
+      { key: 'closestPin', km: s.biggestLetGo?.closestKm ?? 0 },
+      { key: 'submittedOff', km: s.biggestLetGo?.finalKm ?? 0 },
+      { key: 'pointsLetGo', points: s.biggestLetGo?.points ?? 0 },
+    ] },
   { id: 'gutFeeling', weight: 4,
     test: (s) => s.gutFeelingRounds >= 2,
     facts: (s) => [{ key: 'gutFeelingRounds', n: s.gutFeelingRounds }, { key: 'avgPointsPerRound', points: s.avgPoints }] },
@@ -564,6 +592,7 @@ const METRICS: Record<MetricKey, Metric> = {
   avgPinPathKm: { dir: null, unit: 'km', pick: (s) => s.avgPinPathKm },
   avgMoveKm: { dir: null, unit: 'km', pick: (s) => s.avgMoveKm },
   fineTuneRounds: { dir: null, unit: 'count', pick: (s) => s.fineTuneRounds },
+  pointsLetGo: { dir: 'low', unit: 'points', pick: (s) => (s.played ? s.pointsLetGo : null) },
   panoStepsTotal: { dir: null, unit: 'integer', pick: (s) => s.panoStepsTotal },
   panoStepsAvg: { dir: null, unit: 'decimal', pick: (s) => s.panoStepsAvg },
   panDegAvg: { dir: null, unit: 'degreesInt', pick: (s) => s.panDegAvg },
