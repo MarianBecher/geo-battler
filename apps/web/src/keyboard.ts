@@ -19,7 +19,7 @@ export function initKeyboard(opts: { inCountdown: () => boolean; closeStats: () 
     if (e.key === 'Escape') {
       if (!$('stats-overlay').hidden) opts.closeStats();
       else if (!$('hall-overlay').hidden) opts.closeHall();
-      else if (isChatOpen()) setChatOpen(false);
+      else if (isChatOpen()) setChatOpen(false, true);
       return;
     }
 
