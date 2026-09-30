@@ -9,10 +9,10 @@ export type PackId = (typeof PACK_IDS)[number];
 export const DEFAULT_PACK: PackId = 'world';
 export const isPackId = (value: unknown): value is PackId => PACK_IDS.includes(value as PackId);
 
-/** The restrictions the lobby votes on. */
+/** The restrictions everyone sets a wish for. */
 export const VOTE_FLAGS = ['noMove', 'noPan', 'noZoom'] as const;
 export type VoteFlag = (typeof VOTE_FLAGS)[number];
-/** Everything voted on: the restrictions yes/no, the pack by choice. */
+/** Everything in a wish: the restrictions on or off, the pack by choice. */
 export const VOTE_KEYS = [...VOTE_FLAGS, 'pack'] as const;
 export type VoteKey = (typeof VOTE_KEYS)[number];
 
@@ -30,7 +30,7 @@ export interface Settings {
   noPan: boolean;
   noZoom: boolean;
   pack: PackId;
-  /** Which of the voted keys the host locked - the lobby votes on the rest. */
+  /** Which of the wish keys the host locked - the draw decides the rest. */
   locked: Record<VoteKey, boolean>;
 }
 

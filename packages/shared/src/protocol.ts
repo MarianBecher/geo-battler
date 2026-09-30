@@ -71,6 +71,11 @@ export interface PlayerSnapshot {
   spectator: boolean;
 }
 
+/**
+ * Every player who set anything has a whole wish: what they did not set counts
+ * as off, the pack as the world. `no` therefore lists everyone with a wish who
+ * does not want the restriction, and every wisher appears under one pack.
+ */
 export interface VoteTally {
   noMove: { yes: string[]; no: string[] };
   noPan: { yes: string[]; no: string[] };
@@ -79,8 +84,24 @@ export interface VoteTally {
   pack: Partial<Record<PackId, string[]>>;
 }
 
-/** What the restrictions and the pack would be if the game started now. */
+/** The restrictions and the pack as they apply to a game. */
 export type EffectiveFlags = Record<VoteFlag, boolean> & { pack: PackId };
+
+/** The wish drawn at the start of a game - shown while the places load. */
+export interface DrawResult {
+  playerId: string;
+  name: string;
+  color: string;
+  face: number | null;
+  /** What applies, the host's locks included. */
+  flags: EffectiveFlags;
+  /** The keys the host locked - they were not part of the draw. */
+  locked: VoteKey[];
+  /** The other players whose wish came out the same. */
+  alike: string[];
+  /** How many wishes were in the draw. */
+  wishes: number;
+}
 
 export interface TeamState {
   hp: number;
@@ -104,7 +125,8 @@ export interface RoomSnapshot {
   loadError: LoadError | null;
   teamState: Record<TeamId, TeamState> | null;
   votes: VoteTally;
-  flags: EffectiveFlags;
+  /** The wish drawn for the current game, null without wishes. */
+  draw: DrawResult | null;
   players: PlayerSnapshot[];
 }
 

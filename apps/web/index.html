@@ -220,10 +220,11 @@
           </span>
         </label>
 
-        <!-- The lobby votes on the three restrictions, the majority wins.
-             The host can lock them. The vote row is filled by the lobby screen. -->
+        <!-- Everyone sets a wish for the three restrictions and the pack, at
+             the start one wish is drawn. The host can lock them. The rows are
+             filled by the lobby screen. -->
         <div class="toggles">
-          <!-- The map pack: everyone picks one, the most chosen applies. -->
+          <!-- The map pack: everyone picks one as part of their wish. -->
           <div class="vote-card pack-card" data-vote-box="pack">
             <div class="vote-head">
               <div class="vote-text">
@@ -283,10 +284,21 @@
 
 <!-- ========================= Loading ========================= -->
 <section class="screen" id="screen-loading">
-  <div class="loader">
+  <div class="loader" id="loader">
     <div class="spinner"></div>
     <h2 data-i18n="loading.title">Looking for places</h2>
     <p class="hint" data-i18n="loading.hint">The server rolls coordinates until Street View plays along.</p>
+  </div>
+  <!-- The drawn wish as a visa page, filled by the draw screen. -->
+  <div class="visa paper" id="visa" role="status" aria-live="polite" hidden>
+    <p class="visa-head"><span data-i18n="draw.head">Visa · drawn</span><span id="visa-code"></span></p>
+    <div class="visa-who">
+      <span class="visa-photo" id="visa-photo"></span>
+      <div class="visa-name"><h2 id="visa-title"></h2><p id="visa-sub"></p></div>
+    </div>
+    <div class="visa-stamps" id="visa-stamps"></div>
+    <p class="visa-also" id="visa-also"></p>
+    <p class="visa-foot"><span class="spinner"></span><span data-i18n="loading.title">Looking for places</span></p>
   </div>
 </section>
 
@@ -489,5 +501,7 @@
 <div class="toast" id="toast" hidden></div>
 
 <script type="module" src="/src/main.ts"></script>
+<!-- Who wants what: filled by the lobby when hovering or tapping a share. -->
+<div class="vote-pop" id="vote-pop" role="tooltip" hidden></div>
 </body>
 </html>

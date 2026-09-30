@@ -1,7 +1,7 @@
 // Formatting for prose: numbers, distances, facts and metrics - everything
 // the server sends raw and the player reads in their language.
 
-import type { Fact, MetricUnit, ContinentCode, GameErrorPayload, PackId, TeamId, TitleId } from '@geo-battler/shared';
+import type { Fact, MetricUnit, ContinentCode, GameErrorPayload, PackId, TeamId, TitleId, VoteFlag } from '@geo-battler/shared';
 import { fmtNum, t, type MessageKey } from './i18n/index.ts';
 import { formatDistance } from './maps/google.ts';
 
@@ -14,6 +14,8 @@ export const multiplierText = (m: number): string => `×${fmtNum(m)}`;
 
 export const packName = (id: PackId): string => t(`pack.${id}.name`);
 export const packHint = (id: PackId): string => t(`pack.${id}.hint`);
+/** The restrictions go by their GeoGuessr names in every language. */
+export const flagName = (flag: VoteFlag): string => ({ noMove: 'No Move', noPan: 'No Pan', noZoom: 'No Zoom' })[flag];
 export const teamName = (id: TeamId): string => t(`team.${id}`);
 export const teamShort = (id: TeamId): string => t(`team.${id}.short`);
 export const continentName = (code: ContinentCode): string => t(`continent.${code}`);

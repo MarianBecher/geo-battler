@@ -34,9 +34,10 @@ hundred games a month (see [What it costs](#what-it-costs)).
 
 * **Lobby with a code** - whoever has the four-letter code is in; the host
   shares a ready-made link with the code in it
-* **The lobby decides** - the host sets rounds and time limit; everyone votes
-  on No Move / No Pan / No Zoom and picks the map (World, Europe, DACH,
-  Americas, Asia, Africa, Oceania); the host can lock any of it
+* **The lobby decides** - the host sets rounds and time limit; everyone
+  wishes for No Move / No Pan / No Zoom and a map (World, Europe, DACH,
+  Americas, Asia, Africa, Oceania), and one wish is drawn at the start; the
+  host can lock any of it
 * **Classic, Duel, Team duel** - points over fixed rounds, or hit points
   until one player or one team is left standing
 * **Everyone sees the same panorama** and starts on the same 3-2-1 countdown
@@ -237,14 +238,23 @@ never pay anything.
 
 The **NMPZ** button locks all three to *On* at once.
 
-### Voting
+### Wishes and the draw
 
-The whole lobby votes on the three restrictions with *For* and *Against*;
-the majority of votes cast wins, on a tie the current setting stays. The
-host can *Lock* a restriction, which turns the vote into an on/off switch for
-the host alone. No Pan only works with No Move, so a vote for No Pan votes
-for No Move too. The map is a choice: everyone picks one, the most chosen
-applies, without votes the world does.
+Instead of a majority vote, everyone sets a whole wish: *On* or *Off* for
+each restriction and a map. Whatever a player leaves unset counts as off, the
+map as the world; whoever sets nothing has no wish. The lobby shows how many
+players want each restriction on and each map, and hovering (or tapping)
+shows who.
+
+When the game starts, one wish is drawn at random and applies exactly as it
+is, so a minority gets its turn too. While the places load, a visa page shows
+whose wish it was and stamps the four conditions. The first round waits until
+everyone has seen it. The wishes stay for the next game.
+
+The host can *Lock* a restriction or the map, which turns it into an on/off
+switch for the host alone and overrides it on every wish. No Pan only works
+with No Move, so a wish for No Pan includes No Move. Without any wish the
+world without restrictions applies.
 
 ### Duel
 

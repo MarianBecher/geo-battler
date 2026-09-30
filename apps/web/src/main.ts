@@ -16,9 +16,10 @@ import { initSoundButtons } from './ui/sound-button.ts';
 import { initChat, addChatMessage, recolorChat, setChatLog } from './chat.ts';
 import { initKeyboard } from './keyboard.ts';
 import { initHome, ownName, renderHomeCard, showConfigWarning } from './screens/home.ts';
-import { collectSettings, initLobby, paintSettings, renderLobby } from './screens/lobby.ts';
+import { closePop, collectSettings, initLobby, paintSettings, renderLobby } from './screens/lobby.ts';
 import { inCountdown, initGame, renderHudPlayers, showOthersPins, startRound, stopRound, syncPause } from './screens/game.ts';
 import { initReveal, renderRevealList, showReveal } from './screens/reveal.ts';
+import { leaveDraw, renderDraw } from './screens/draw.ts';
 import { closeStats, initFinal, showFinal } from './screens/final.ts';
 import { closeHall, initHall } from './screens/hall.ts';
 import { errorText } from './format.ts';
@@ -88,12 +89,14 @@ on('room', ({ room }) => {
       show('screen-lobby');
     }
   } else if (room.phase === 'loading') {
+    closePop();
     show('screen-loading');
   }
+  renderDraw(room);
   syncPause();
 });
 
-on('round', (msg) => startRound(msg, () => show('screen-game')));
+on('round', (msg) => leaveDraw(() => startRound(msg, () => show('screen-game'))));
 on('pins', (msg) => showOthersPins(msg.round, msg.pins));
 on('reveal', (msg) => {
   stopRound();

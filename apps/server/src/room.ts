@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import {
   COUNTDOWN_MS, DEFAULT_PACK, DEFAULT_SETTINGS, LIMITS, PLAYER_COLORS, TEAM_IDS, TEAM_PALETTES, TEAMS, VOTE_FLAGS, VOTE_KEYS,
   damageMultiplier, distanceKm, isPackId, isTeamId, scoreGuess,
-  type EffectiveFlags, type GameMode, type LatLng, type LeaderboardEntry, type LoadError, type PackId, type PlayedRound,
+  type DrawResult, type EffectiveFlags, type GameMode, type LatLng, type LeaderboardEntry, type LoadError, type PackId, type PlayedRound,
   type RevealMessage, type RoomPhase, type RoomSnapshot, type RoundMessage, type RoundResult, type Settings, type SpectatorReason,
   type TeamId, type TeamRoundResult, type TeamStanding, type TeamState, type VoteFlag, type VoteKey, type VoteTally, type PinSnapshot, type ChatMessage,
   GAME_MODES,
@@ -34,6 +34,12 @@ const CHAT_WINDOW_MS = 4000;
 // batches while the reveal is showing instead of all at once.
 const DUEL_BATCH = 3;   // this many locations are fetched at once
 const DUEL_BUFFER = 2;  // fewer than this in stock triggers a top-up
+
+/**
+ * How long the drawn wish is shown before the first round - at least, the
+ * places may take longer. The client's animation is built to fit.
+ */
+export const DRAW_REVEAL_MS = 4500;
 
 /** What a player's socket must offer the room: nothing but a way to be closed. */
 export interface PlayerSocket {
@@ -84,6 +90,18 @@ export const googleFinder = (apiKey: string): LocationFinder => async (count, op
 };
 
 type Ballot = Partial<Record<VoteFlag, boolean>> & { pack?: PackId };
+
+/** A ballot as a whole wish: what the player did not set is off, the pack the world. */
+function wishOf(ballot: Ballot): EffectiveFlags {
+  return { noMove: !!ballot.noMove, noPan: !!ballot.noPan, noZoom: !!ballot.noZoom, pack: ballot.pack ?? DEFAULT_PACK };
+}
+
+export interface RoomOptions {
+  /** Picks the wish - tests pass their own. Returns a number in [0, 1). */
+  random?: () => number;
+  /** See DRAW_REVEAL_MS. */
+  drawRevealMs?: number;
+}
 
 // --- Input sanitising ----------------------------------------------------------
 
@@ -137,23 +155,6 @@ function normalizePin(lat: number, lng: number): LatLng & { at: number } {
   return { lat, lng: ((((lng + 180) % 360) + 360) % 360) - 180, at: Date.now() };
 }
 
-/** The most chosen pack - none on a tie at the top. */
-export function leadingPack(packVotes: Partial<Record<PackId, string[]>>): PackId | null {
-  let best: PackId | null = null;
-  let bestCount = 0;
-  let tied = false;
-  for (const [id, voters] of Object.entries(packVotes) as [PackId, string[]][]) {
-    if (voters.length > bestCount) {
-      best = id;
-      bestCount = voters.length;
-      tied = false;
-    } else if (voters.length === bestCount && bestCount > 0) {
-      tied = true;
-    }
-  }
-  return tied ? null : best;
-}
-
 // --- The room ------------------------------------------------------------------
 
 export class Room {
@@ -181,13 +182,20 @@ export class Room {
   private locationFetch: Promise<void> | null = null;
   private teamState: Record<TeamId, TeamState> | null = null;
   private readonly votes = new Map<string, Ballot>();
+  private draw: DrawResult | null = null;
   private chatSeq = 0;
   /** Names (lower-cased) the host kicked. */
   private readonly banned = new Set<string>();
   private pausedAt: number | null = null;
   private pauseLeftMs: number | null = null;
 
-  constructor(readonly code: string, private readonly finder: LocationFinder) {}
+  private readonly random: () => number;
+  private readonly drawRevealMs: number;
+
+  constructor(readonly code: string, private readonly finder: LocationFinder, options: RoomOptions = {}) {
+    this.random = options.random ?? Math.random;
+    this.drawRevealMs = options.drawRevealMs ?? DRAW_REVEAL_MS;
+  }
 
   isPaused(): boolean { return this.pausedAt !== null; }
   isDuel(): boolean { return this.settings.mode === 'duel'; }
@@ -477,12 +485,11 @@ export class Room {
     return message;
   }
 
-  // --- Voting on No Move / No Pan / No Zoom and the map pack ------------
+  // --- Wishes for No Move / No Pan / No Zoom and the map pack ------------
   //
-  // For the restrictions everyone votes for or against, and the majority of
-  // votes cast wins. For the pack everyone picks one, and the most chosen
-  // wins. On a tie (or without votes) the current setting stays. If the host
-  // locks something, the vote on it does not count.
+  // Everyone who sets anything has a whole wish (see wishOf). At the start
+  // one wish is drawn at random and applies as it is, so a minority gets its
+  // turn too. Whatever the host locks applies on every wish.
 
   vote(playerId: string, flag: VoteKey, value: boolean | PackId | null): void {
     if (!this.inLobby()) fail('lobbyOnlyVote');
@@ -496,8 +503,7 @@ export class Room {
       if (value !== null && !isPackId(value)) fail('unknownPack');
       if (value === null) delete ballot.pack;
       else ballot.pack = value;
-      this.votes.set(playerId, ballot);
-      this.events.onChange();
+      this.storeBallot(playerId, ballot);
       return;
     }
 
@@ -507,49 +513,83 @@ export class Room {
     if (value === null) delete ballot[flag];
     else ballot[flag] = value;
 
-    // No Pan requires No Move - on every single ballot. Then No Pan can
-    // never win the majority without No Move in the total either.
+    // No Pan requires No Move - on every single wish.
     if (flag === 'noPan' && ballot.noPan === true && !locked.noMove) ballot.noMove = true;
     if (flag === 'noMove' && ballot.noMove !== true && ballot.noPan === true) {
       if (ballot.noMove === false) ballot.noPan = false;
       else delete ballot.noPan;
     }
+    this.storeBallot(playerId, ballot);
+  }
 
-    this.votes.set(playerId, ballot);
+  /** A ballot with nothing set is no wish. */
+  private storeBallot(playerId: string, ballot: Ballot): void {
+    if (Object.keys(ballot).length) this.votes.set(playerId, ballot);
+    else this.votes.delete(playerId);
     this.events.onChange();
   }
 
-  /** Votes per restriction and per pack - only from players still present. */
+  /** The wishes of the players still present. */
+  private wishes(): { player: Player; wish: EffectiveFlags }[] {
+    return [...this.votes]
+      .map(([id, ballot]) => ({ player: this.players.get(id), wish: wishOf(ballot) }))
+      .filter((w): w is { player: Player; wish: EffectiveFlags } => !!w.player?.connected);
+  }
+
+  /** Who wants what, per restriction and per pack. */
   voteTally(): VoteTally {
     const tally: VoteTally = { noMove: { yes: [], no: [] }, noPan: { yes: [], no: [] }, noZoom: { yes: [], no: [] }, pack: {} };
-    for (const [playerId, ballot] of this.votes) {
-      if (!this.players.has(playerId)) continue;
-      for (const flag of VOTE_FLAGS) {
-        if (ballot[flag] === true) tally[flag].yes.push(playerId);
-        else if (ballot[flag] === false) tally[flag].no.push(playerId);
-      }
-      if (ballot.pack) (tally.pack[ballot.pack] ??= []).push(playerId);
+    for (const { player, wish } of this.wishes()) {
+      for (const flag of VOTE_FLAGS) tally[flag][wish[flag] ? 'yes' : 'no'].push(player.id);
+      (tally.pack[wish.pack] ??= []).push(player.id);
     }
     return tally;
   }
 
-  /** What would apply if the game started now. */
-  effectiveFlags(): EffectiveFlags {
+  /** A wish with the host's locks laid over it. */
+  private withLocks(wish: EffectiveFlags): EffectiveFlags {
     const { locked } = this.settings;
-    const tally = this.voteTally();
-    const out = { noMove: false, noPan: false, noZoom: false, pack: DEFAULT_PACK } as EffectiveFlags;
-    for (const flag of VOTE_FLAGS) {
-      const { yes, no } = tally[flag];
-      out[flag] = locked[flag] || yes.length === no.length ? this.settings[flag] : yes.length > no.length;
-    }
-    // Without votes the world applies - not the pack of the last game. Only a lock by the host stays.
-    out.pack = locked.pack ? this.settings.pack : (leadingPack(tally.pack) ?? DEFAULT_PACK);
-    // The ballots are consistent in themselves, but a lock by the host can cut across: then the lock wins.
+    const out = { ...wish };
+    for (const key of VOTE_KEYS) if (locked[key]) Object.assign(out, { [key]: this.settings[key] });
+    // The wish is consistent in itself, but a lock can cut across: then the lock wins.
     if (out.noPan && !out.noMove) {
       if (locked.noMove) out.noPan = false;
       else out.noMove = true;
     }
     return out;
+  }
+
+  /**
+   * Draws the wish for the next game. Without wishes, or with everything
+   * locked, there is nothing to draw: then the locks and otherwise the
+   * defaults apply.
+   */
+  drawWish(): { flags: EffectiveFlags; draw: DrawResult | null } {
+    const wishes = this.wishes();
+    const locked = VOTE_KEYS.filter((key) => this.settings.locked[key]);
+    const fallback = this.withLocks({ noMove: false, noPan: false, noZoom: false, pack: DEFAULT_PACK });
+    if (!wishes.length || locked.length === VOTE_KEYS.length) return { flags: fallback, draw: null };
+
+    const index = Math.min(wishes.length - 1, Math.floor(this.random() * wishes.length));
+    const { player, wish } = wishes[index]!;
+    const flags = this.withLocks(wish);
+    const same = (other: EffectiveFlags): boolean => {
+      const o = this.withLocks(other);
+      return o.pack === flags.pack && VOTE_FLAGS.every((f) => o[f] === flags[f]);
+    };
+    return {
+      flags,
+      draw: {
+        playerId: player.id,
+        name: player.name,
+        color: player.color,
+        face: player.face,
+        flags,
+        locked,
+        alike: wishes.filter((w) => w.player.id !== player.id && same(w.wish)).map((w) => w.player.id),
+        wishes: wishes.length,
+      },
+    };
   }
 
   // --- Ready -------------------------------------------------------------
@@ -603,9 +643,10 @@ export class Room {
       if (empty) fail('teamEmpty', { team: empty.id });
     }
 
-    // From here on the vote result applies. It stays as the setting - on a
-    // tie in the next lobby, whatever applied last counts.
-    Object.assign(this.settings, this.effectiveFlags());
+    // The drawn wish applies from here on and stays as the setting.
+    const { flags, draw } = this.drawWish();
+    Object.assign(this.settings, flags);
+    this.draw = draw;
 
     const duel = this.isDuel();
     this.teamState = this.isTeamDuel()
@@ -633,9 +674,13 @@ export class Room {
 
     try {
       // In a duel the number of rounds is open - fetch a stock first, the rest is topped up during the reveals.
+      // Everyone gets to see the drawn wish, even if the places come quickly.
+      const shown = draw && this.drawRevealMs > 0 ? new Promise((resolve) => setTimeout(resolve, this.drawRevealMs)) : null;
       this.locations = await this.findLocations(duel ? DUEL_BATCH : this.settings.rounds);
+      if (shown) await shown;
     } catch (err) {
       this.phase = 'lobby';
+      this.draw = null;
       this.loadError = errorPayload(err);
       this.events.onChange();
       throw err;
@@ -972,6 +1017,7 @@ export class Room {
     this.loadError = null;
     this.finalStatsCache = null;
     this.teamState = null;
+    this.draw = null;
     this.clearReady();
     for (const p of this.players.values()) {
       p.score = 0;
@@ -1129,7 +1175,7 @@ export class Room {
       loadError: this.loadError,
       teamState: this.teamState,
       votes: this.voteTally(),
-      flags: this.effectiveFlags(),
+      draw: this.draw,
       players: [...this.players.values()].map((p) => ({
         id: p.id,
         name: p.name,

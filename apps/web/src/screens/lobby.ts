@@ -1,14 +1,15 @@
 // The lobby: the open passport with the travellers on the left and the
-// travel conditions on the right. Settings belong to the host, the three
-// restrictions and the map pack are voted on.
+// travel conditions on the right. Settings belong to the host. For the three
+// restrictions and the map pack everyone sets a wish, and at the start one
+// wish is drawn (see the draw screen).
 
 import {
-  DEFAULT_SETTINGS, LIMITS, TEAMS, VOTE_FLAGS, isPackId,
-  type PackId, type PlayerSnapshot, type RoomSnapshot, type Settings, type TeamId, type VoteFlag, type VoteKey,
+  DEFAULT_PACK, DEFAULT_SETTINGS, LIMITS, TEAMS, VOTE_FLAGS, isPackId,
+  type EffectiveFlags, type PackId, type PlayerSnapshot, type RoomSnapshot, type Settings, type TeamId, type VoteFlag, type VoteKey, type VoteTally,
 } from '@geo-battler/shared';
 import { $, escapeHtml, inkOn, toast } from '../dom.ts';
 import { fmtNum, t } from '../i18n/index.ts';
-import { errorText, fmtTime, mrzPad, mrzText, packHint, packName, teamName } from '../format.ts';
+import { errorText, flagName, fmtTime, mrzPad, mrzText, packHint, packName, teamName } from '../format.ts';
 import { photo, randomFace, rememberFace } from '../photo.ts';
 import { isHost, isMe, isTeamDuel, me, state } from '../state.ts';
 import { send } from '../socket.ts';
@@ -100,33 +101,51 @@ function paintVoteBody(box: HTMLElement, body: string): void {
 
 const voteBox = (key: VoteKey): HTMLElement => document.querySelector<HTMLElement>(`[data-vote-box="${key}"]`)!;
 
+/** Every player's whole wish, rebuilt from the tally. */
+function wishesOf(votes: VoteTally): Map<string, EffectiveFlags> {
+  const out = new Map<string, EffectiveFlags>();
+  for (const [pack, ids] of Object.entries(votes.pack) as [PackId, string[]][]) {
+    for (const id of ids) {
+      out.set(id, { pack, noMove: votes.noMove.yes.includes(id), noPan: votes.noPan.yes.includes(id), noZoom: votes.noZoom.yes.includes(id) });
+    }
+  }
+  return out;
+}
+
+const percent = (part: number, whole: number): string => `${fmtNum(whole ? Math.round((part / whole) * 100) : 0)}\u00a0%`;
+
+/** The share of wishes that come out the same as mine - the host's locks apply to all of them alike. */
+function myChance(room: RoomSnapshot, wishes: Map<string, EffectiveFlags>, mine: EffectiveFlags): string {
+  const open = (['pack', ...VOTE_FLAGS] as VoteKey[]).filter((key) => !room.settings.locked[key]);
+  const same = [...wishes.values()].filter((w) => open.every((key) => w[key] === mine[key])).length;
+  return percent(same, wishes.size);
+}
+
 /**
- * The three restrictions with their vote. The result on the right shows what
- * would apply at the start - "On" as a red stamp. Below it the vote row: a
- * for/against switch while open, the host's on/off switch when locked.
+ * The three restrictions. While open, the result on the right says how many
+ * of the wishes have it on, below it your own On/Off and who wants what.
+ * Locked by the host, the result is the host's On/Off as a stamp.
  */
 function paintVotes(room: RoomSnapshot): void {
-  const flags = room.flags;
   const locked = room.settings.locked;
   const host = isHost() && room.phase === 'lobby';
-  const names = new Map(room.players.map((p) => [p.id, p.name]));
-  const who = (ids: string[]): string => (ids.length ? ids.map((id) => escapeHtml(names.get(id) ?? '?')).join(', ') : t('vote.nobodyYet'));
+  const wishes = wishesOf(room.votes);
+  const total = wishes.size;
+  const mine = state.playerId ? wishes.get(state.playerId) ?? null : null;
 
   for (const flag of VOTE_FLAGS) {
     const box = voteBox(flag);
-    const tally = room.votes[flag];
-    const yes = tally.yes.length;
-    const no = tally.no.length;
-    const on = flags[flag];
-    // No Pan only works with No Move - if the host switched No Move off, there is nothing left to vote on here.
+    const yes = room.votes[flag].yes.length;
+    const on = room.settings[flag];
+    // No Pan only works with No Move - if the host switched No Move off, there is nothing left to wish for here.
     const blocked = flag === 'noPan' && locked.noMove && !room.settings.noMove;
-    const forced = flag === 'noMove' && on && flags.noPan && !locked.noMove && !(yes > no);
 
-    box.classList.toggle('on', on);
+    box.classList.toggle('on', locked[flag] && on);
     box.classList.toggle('locked', locked[flag]);
     const result = box.querySelector<HTMLElement>('.vote-result')!;
-    result.innerHTML = (locked[flag] ? LOCK_ICON : '') + (on ? t('vote.on') : t('vote.off'));
-    result.title = locked[flag] ? t('vote.lockedByHost') : t('vote.currentState');
+    result.classList.toggle('share', !locked[flag]);
+    result.innerHTML = locked[flag] ? LOCK_ICON + (on ? t('vote.on') : t('vote.off')) : total ? percent(yes, total) : '–';
+    result.title = locked[flag] ? t('vote.lockedByHost') : t('vote.shareTitle');
 
     let body: string;
     if (locked[flag]) {
@@ -141,42 +160,38 @@ function paintVotes(room: RoomSnapshot): void {
     } else if (blocked) {
       body = `<span class="vote-state">${t('vote.onlyWithNoMove')}</span>`;
     } else {
-      const mine = state.playerId && tally.yes.includes(state.playerId) ? 'yes' : state.playerId && tally.no.includes(state.playerId) ? 'no' : null;
-      const reason = forced ? t('vote.onBecauseNoPan')
-        : yes > no ? t('vote.majorityFor')
-          : no > yes ? t('vote.majorityAgainst')
-            : yes ? t('vote.tie') : t('vote.noVotesYet');
+      const who = total
+        ? `<button type="button" class="who-btn" data-who="${flag}" aria-expanded="false">${t('vote.wantItOn', { n: yes, total })}</button>`
+        : t('vote.noWishesYet');
       body = `<div class="seg" role="group" aria-label="${escapeHtml(t('vote.yourVote'))}">
-          <button type="button" data-vote="${flag}" data-value="yes" aria-pressed="${mine === 'yes'}" title="${t('vote.for')}: ${who(tally.yes)}">${t('vote.for')} <b>${yes}</b></button>
-          <button type="button" data-vote="${flag}" data-value="no" aria-pressed="${mine === 'no'}" title="${t('vote.against')}: ${who(tally.no)}">${t('vote.against')} <b>${no}</b></button>
+          <button type="button" data-vote="${flag}" data-value="yes" aria-pressed="${!!mine?.[flag]}">${t('vote.on')}</button>
+          <button type="button" data-vote="${flag}" data-value="no" aria-pressed="${!!mine && !mine[flag]}">${t('vote.off')}</button>
         </div>
-        <span class="vote-state">${reason}</span>
+        <span class="vote-state">${who}</span>
         ${host ? `<button type="button" class="vote-link" data-lock="${flag}">${t('vote.lock')}</button>` : ''}`;
     }
     paintVoteBody(box, body);
   }
-  paintPackVote(room, host, who);
+  paintPackVote(room, host, wishes, mine);
 }
 
-/** The map pack: a choice instead of for/against. The leading pack applies - locked, only the host picks. */
-function paintPackVote(room: RoomSnapshot, host: boolean, who: (ids: string[]) => string): void {
+/** The map pack: a choice instead of On/Off. Open, every pack shows its share of the wishes; locked, only the host picks. */
+function paintPackVote(room: RoomSnapshot, host: boolean, wishes: Map<string, EffectiveFlags>, mine: EffectiveFlags | null): void {
   const box = voteBox('pack');
   const packs = state.config?.packs ?? [];
   const locked = room.settings.locked.pack;
   const votes = room.votes.pack;
-  const chosen = room.flags.pack;
-  const mine = (Object.entries(votes) as [PackId, string[]][]).find(([, ids]) => state.playerId && ids.includes(state.playerId))?.[0] ?? null;
+  const total = wishes.size;
+  const chosen = room.settings.pack;
+  const distinct = Object.keys(votes).length;
 
-  box.classList.toggle('on', chosen !== 'world');
+  box.classList.toggle('on', locked && chosen !== DEFAULT_PACK);
   box.classList.toggle('locked', locked);
   const result = box.querySelector<HTMLElement>('.vote-result')!;
-  result.innerHTML = (locked ? LOCK_ICON : '') + escapeHtml(packName(chosen));
-  result.title = locked ? t('vote.lockedByHost') : t('vote.currentState');
-  $('pack-hint').textContent = packHint(chosen);
-
-  const counts = Object.values(votes).map((ids) => ids.length);
-  const top = Math.max(0, ...counts);
-  const leaders = (Object.entries(votes) as [PackId, string[]][]).filter(([, ids]) => ids.length === top && top > 0);
+  result.classList.toggle('share', !locked);
+  result.innerHTML = locked ? LOCK_ICON + escapeHtml(packName(chosen)) : total ? t('vote.packs', { n: distinct }) : '–';
+  result.title = locked ? t('vote.lockedByHost') : t('vote.packsTitle');
+  $('pack-hint').textContent = packHint(locked ? chosen : mine?.pack ?? DEFAULT_PACK);
 
   let body: string;
   if (locked && !host) {
@@ -184,22 +199,72 @@ function paintPackVote(room: RoomSnapshot, host: boolean, who: (ids: string[]) =
   } else {
     const attr = locked ? 'data-set' : 'data-vote';
     const chips = packs.map((id) => {
-      const ids = votes[id] ?? [];
-      const pressed = locked ? id === chosen : mine === id;
-      const count = !locked && ids.length ? ` <b>${ids.length}</b>` : '';
-      return `<button type="button" ${attr}="pack" data-value="${id}" aria-pressed="${pressed}" title="${escapeHtml(packHint(id))}${locked ? '' : ` - ${who(ids)}`}">${escapeHtml(packName(id))}${count}</button>`;
+      const count = votes[id]?.length ?? 0;
+      const pressed = locked ? id === chosen : mine?.pack === id;
+      const share = !locked && count ? ` <b>${percent(count, total)}</b>` : '';
+      const who = !locked && count ? ` data-who="pack:${id}"` : '';
+      return `<button type="button" ${attr}="pack" data-value="${id}" aria-pressed="${pressed}"${who}>${escapeHtml(packName(id))}${share}</button>`;
     }).join('');
-    const reason = locked ? t('vote.lockedByYou')
-      : top === 0 ? t('vote.noVotesYet')
-        : leaders.length > 1 ? t('vote.tie')
-          : t('vote.majorityForPack', { pack: escapeHtml(packName(leaders[0]![0])) });
+    const explain = locked ? t('vote.lockedByYou')
+      : !total ? t('vote.noWishesStart')
+        : `${t('vote.drawExplain', { n: total })} ${mine ? t('vote.yourChance', { pct: myChance(room, wishes, mine) }) : t('vote.setToCount')}`;
     body = `<div class="seg pack-seg" role="group" aria-label="${escapeHtml(locked ? t('vote.lockPackAria') : t('vote.yourChoice'))}">${chips}</div>
-      <span class="vote-state">${reason}</span>
+      <span class="vote-state">${explain}</span>
       ${host ? (locked
         ? `<button type="button" class="vote-link" data-unlock="pack">${t('vote.letVote')}</button>`
         : `<button type="button" class="vote-link" data-lock="pack">${t('vote.lock')}</button>`) : ''}`;
   }
   paintVoteBody(box, body);
+}
+
+// --- Who wants what ------------------------------------------------------------
+//
+// Hovering (or tapping) "3 of 4 want it on" or a pack's share opens a small
+// card with the names. It is built from the room at the moment it opens.
+
+let popAnchor: HTMLElement | null = null;
+/** How the last press came in - a mouse already opened the card by hovering. */
+let lastPointer = 'mouse';
+/** When it came in: focus right after a press is the press, not the keyboard. */
+let pressedAt = 0;
+
+function popContent(key: string): string {
+  const room = state.room;
+  if (!room) return '';
+  const players = new Map(room.players.map((p) => [p.id, p]));
+  const list = (ids: string[]): string => (ids.length
+    ? `<ul>${ids.map((id) => players.get(id)).filter((p) => !!p).map((p) => `<li><i class="dot" style="background:${p.color}"></i>${escapeHtml(p.name)}</li>`).join('')}</ul>`
+    : `<ul><li class="none">${t('vote.nobodyYet')}</li></ul>`);
+  if (key.startsWith('pack:')) {
+    const id = key.slice(5);
+    if (!isPackId(id)) return '';
+    return `<div><h4>${escapeHtml(t('vote.whoPack', { pack: packName(id) }))}</h4>${list(room.votes.pack[id] ?? [])}</div>`;
+  }
+  const flag = key as VoteFlag;
+  const name = flagName(flag);
+  return `<div><h4>${escapeHtml(t('vote.whoOn', { flag: name }))}</h4>${list(room.votes[flag].yes)}</div>
+    <div><h4>${escapeHtml(t('vote.whoOff', { flag: name }))}</h4>${list(room.votes[flag].no)}</div>`;
+}
+
+function openPop(anchor: HTMLElement): void {
+  const pop = $('vote-pop');
+  const html = popContent(anchor.dataset.who ?? '');
+  if (!html) return;
+  popAnchor?.setAttribute('aria-expanded', 'false');
+  popAnchor = anchor;
+  if (anchor.classList.contains('who-btn')) anchor.setAttribute('aria-expanded', 'true');
+  pop.innerHTML = html;
+  pop.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  pop.style.left = `${Math.max(12, Math.min(r.left, innerWidth - pop.offsetWidth - 12))}px`;
+  const below = r.bottom + 6;
+  pop.style.top = `${below + pop.offsetHeight > innerHeight - 8 ? Math.max(8, r.top - pop.offsetHeight - 6) : below}px`;
+}
+
+export function closePop(): void {
+  popAnchor?.setAttribute('aria-expanded', 'false');
+  popAnchor = null;
+  $('vote-pop').hidden = true;
 }
 
 function setSettingsEditable(editable: boolean): void {
@@ -337,6 +402,12 @@ export function renderLobby(room: RoomSnapshot): void {
   paintSettings(room.settings);
   setSettingsEditable(isHost() && (room.phase === 'lobby' || room.phase === 'finished'));
   paintVotes(room);
+  if (popAnchor) {
+    // The row may have been redrawn - follow the new anchor, or close.
+    const anchor = document.querySelector<HTMLElement>(`#screen-lobby [data-who="${popAnchor.dataset.who ?? ''}"]`);
+    if (anchor && document.querySelector('#screen-lobby.active')) openPop(anchor);
+    else closePop();
+  }
   renderColorChoice(room.players);
   renderReadyUi();
 
@@ -434,29 +505,59 @@ export function initLobby(opts: { leaveToHome: () => void; toggleReady: () => vo
   $('screen-lobby').addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('.vote-body button');
     if (!btn) return;
-    const flags = state.room?.flags;
+    const votes = state.room?.votes;
     const pressed = btn.getAttribute('aria-pressed') === 'true';
     const value = btn.dataset.value ?? '';
 
-    if (btn.dataset.vote === 'pack') {
-      send({ t: 'vote', flag: 'pack', value: pressed || !isPackId(value) ? null : value });
+    if (btn.classList.contains('who-btn')) {
+      // Touch has no hover: a tap opens the names, a second one closes them.
+      if (popAnchor !== btn) openPop(btn);
+      else if (lastPointer !== 'mouse') closePop();
+    } else if (btn.dataset.vote === 'pack') {
+      if (!pressed && isPackId(value)) send({ t: 'vote', flag: 'pack', value });
     } else if (btn.dataset.vote) {
-      // Clicking your own vote again withdraws it.
-      send({ t: 'vote', flag: btn.dataset.vote as VoteFlag, value: pressed ? null : value === 'yes' });
+      // A wish is always whole - pressing your own choice again changes nothing.
+      if (!pressed) send({ t: 'vote', flag: btn.dataset.vote as VoteFlag, value: value === 'yes' });
     } else if (btn.dataset.set === 'pack') {
       if (isPackId(value)) lockFlag('pack', value);
     } else if (btn.dataset.set) {
       lockFlag(btn.dataset.set as VoteFlag, value === 'on');
     } else if (btn.dataset.lock === 'pack') {
-      lockFlag('pack', flags?.pack ?? state.room?.settings.pack ?? 'world');
+      // Locking takes over what most players wish for.
+      const top = (Object.entries(votes?.pack ?? {}) as [PackId, string[]][]).sort((a, b) => b[1].length - a[1].length)[0]?.[0];
+      lockFlag('pack', top ?? state.room?.settings.pack ?? DEFAULT_PACK);
     } else if (btn.dataset.lock) {
-      // Locking takes over the current state of the vote first.
       const flag = btn.dataset.lock as VoteFlag;
-      lockFlag(flag, !!flags?.[flag]);
+      lockFlag(flag, !!votes && votes[flag].yes.length > votes[flag].no.length);
     } else if (btn.dataset.unlock) {
       lockFlag(btn.dataset.unlock as VoteKey, null);
     }
   });
+
+  const lobbyScreen = $('screen-lobby');
+  const hoverTarget = (e: Event): HTMLElement | null => (e.target as HTMLElement).closest<HTMLElement>('[data-who]');
+  lobbyScreen.addEventListener('pointerover', (e) => {
+    const el = hoverTarget(e);
+    if (el && e.pointerType === 'mouse' && el !== popAnchor) openPop(el);
+  });
+  lobbyScreen.addEventListener('pointerout', (e) => {
+    const el = hoverTarget(e);
+    if (el && e.pointerType === 'mouse' && !el.contains(e.relatedTarget as Node | null)) closePop();
+  });
+  lobbyScreen.addEventListener('focusin', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.who-btn');
+    if (el && performance.now() - pressedAt > 500) openPop(el);
+  });
+  lobbyScreen.addEventListener('focusout', (e) => {
+    if ((e.target as HTMLElement).closest('.who-btn')) closePop();
+  });
+  document.addEventListener('pointerdown', (e) => {
+    lastPointer = e.pointerType;
+    pressedAt = performance.now();
+    if (popAnchor && !(e.target as HTMLElement).closest('[data-who]')) closePop();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && popAnchor) closePop(); });
+  lobbyScreen.addEventListener('scroll', closePop, { capture: true, passive: true });
 
   $('mode-switch').addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]');
