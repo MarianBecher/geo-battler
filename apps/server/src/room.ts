@@ -1065,8 +1065,21 @@ export class Room {
     const entries = [...this.players.values()].filter((p) => p.stats.length)
       .map((p) => ({ playerId: p.id, name: p.name, color: p.color, score: p.score, rounds: p.stats }));
 
+    const duel = this.isDuel()
+      ? {
+          startHp: this.settings.hp,
+          teams: this.isTeamDuel(),
+          rounds: this.history.map((r) => ({
+            round: r.round,
+            damage: new Map(r.results.filter((x) => x.contender).map((x) => [x.playerId, x.damage ?? 0])),
+            knockedOut: new Set(r.results.filter((x) => x.knockedOut).map((x) => x.playerId)),
+          })),
+          hpLeft: new Map(entries.map((e) => [e.playerId, this.players.get(e.playerId)?.hp ?? 0])),
+        }
+      : null;
+
     this.finalStatsCache = entries.length
-      ? buildFinalStats(entries, { roundWinners, actuals, actualSpreadKm, settings: this.settings, timeLimitMs: this.settings.timeLimit * 1000 })
+      ? buildFinalStats(entries, { roundWinners, actuals, actualSpreadKm, settings: this.settings, timeLimitMs: this.settings.timeLimit * 1000, duel })
       : { titles: {}, metrics: [] };
     return this.finalStatsCache;
   }

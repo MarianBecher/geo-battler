@@ -28,6 +28,7 @@ const TITLE_ICONS: Record<TitleGroup, string | null> = {
   map: '<path d="M12 22s7-7.2 7-12a7 7 0 0 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
   timing: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
   streetview: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  duel: '<path d="M4 3l13 13M20 3L7 16M14 19l5-5M5 14l5 5M3 21l3-3M21 21l-3-3"/>',
   note: null,
 };
 

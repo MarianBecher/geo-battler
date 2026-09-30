@@ -1916,15 +1916,16 @@ input::placeholder { color: #6a768e; }
 .ts-label { font-size: 11px; font-weight: 800; letter-spacing: .14em; }
 .ts-name { font-size: clamp(17px, calc(400px / var(--len, 12)), 21px); font-weight: 900; hyphens: auto; overflow-wrap: break-word; }
 
-.ts-treffer { color: var(--red); border: 5px double; border-radius: 9px; }
+.ts-accuracy { color: var(--red); border: 5px double; border-radius: 9px; }
 .ts-form { color: #2b3f6b; border-radius: 3px; }
-.ts-geografie { color: var(--green); border-radius: 999px; padding-inline: 11px 16px; }
-.ts-karte { color: #1f5f8b; border-style: dashed; }
-.ts-tempo { color: #9a4a14; box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3.5px currentColor; }
+.ts-geography { color: var(--green); border-radius: 999px; padding-inline: 11px 16px; }
+.ts-map { color: #1f5f8b; border-style: dashed; }
+.ts-timing { color: #9a4a14; box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3.5px currentColor; }
 .ts-streetview { color: #1d6b69; border: 5px double; border-radius: 999px; padding-inline: 11px 16px; }
-.ts-vermerk { color: var(--grey-ink); border-width: 2px; border-radius: 4px; padding-left: 11px; }
+.ts-duel { color: #7a1f2b; border-width: 4px; border-radius: 0; }
+.ts-note { color: var(--grey-ink); border-width: 2px; border-radius: 4px; padding-left: 11px; }
 /* On your own row's highlighter the inner rule takes the highlighter's colour. */
-.podium li.me .ts-tempo { box-shadow: inset 0 0 0 2px var(--marker-solid), inset 0 0 0 3.5px currentColor; }
+.podium li.me .ts-timing { box-shadow: inset 0 0 0 2px var(--marker-solid), inset 0 0 0 3.5px currentColor; }
 .podium .title-why { font-size: 14px; color: var(--ink-2); line-height: 1.35; }
 .podium .title-facts { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .podium .pts {

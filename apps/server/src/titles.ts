@@ -26,6 +26,22 @@ export interface PlayerEntry {
   rounds: RoundStat[];
 }
 
+/** Duel: the damage of every round, as the reveal reported it. */
+export interface DuelRound {
+  round: number;
+  /** playerId -> damage taken; only players still in the race. */
+  damage: Map<string, number>;
+  knockedOut: Set<string>;
+}
+
+export interface DuelLog {
+  startHp: number;
+  teams: boolean;
+  rounds: DuelRound[];
+  /** playerId -> hit points at the end */
+  hpLeft: Map<string, number>;
+}
+
 export interface TitleContext {
   /** round -> ids of the players who won it */
   roundWinners: Map<number, Set<string>>;
@@ -35,11 +51,18 @@ export interface TitleContext {
   actualSpreadKm: number;
   settings: Settings;
   timeLimitMs: number;
+  /** Only in a duel. */
+  duel: DuelLog | null;
 }
 
 interface Context extends TitleContext {
   /** round -> how many submitted at all */
   confirmCounts: Map<number, number>;
+  /** round -> the points of everyone who guessed in it */
+  roundPoints: Map<number, number[]>;
+  /** Classic: playerId -> total before the last round (for "Buzzer Beater" and "Choker"). */
+  scoreBeforeLast: Map<string, number>;
+  lastRound: number;
 }
 
 // --- Small helpers ---------------------------------------------------------
@@ -71,6 +94,9 @@ function isBottom(s: Summary, all: Summary[], pick: Pick, max: number): boolean 
   return all.every((other) => pick(other) >= value);
 }
 
+/** Classic with a last round worth looking at: the lead before it is only known after two rounds. */
+const isLastRoundSwing = (ctx: Context, all: Summary[]): boolean => ctx.settings.mode === 'classic' && ctx.lastRound >= 2 && all.length >= 2;
+
 /** Gap to the leader - for "Photo Finish". */
 const scoreGap = (s: Summary, all: Summary[]): number => Math.max(...all.map((x) => x.score)) - s.score;
 
@@ -88,6 +114,21 @@ interface LetGo {
   finalKm: number;
   /** Points the closest pin would have earned, minus what was earned. */
   points: number;
+}
+
+/** The continent a player is good at - and the rest of the world, where they are not. */
+interface Specialty extends RegionSummary {
+  elsewhereAvg: number;
+  elsewhereRounds: number;
+}
+
+interface DuelSummary {
+  hpLeft: number;
+  damageTaken: number;
+  /** Damage the others took in the rounds this player set the mark. */
+  damageDealt: number;
+  /** Set the mark in the round that decided the game. */
+  finalBlow: { round: number; knockouts: number } | null;
 }
 
 interface Rival {
@@ -121,6 +162,9 @@ export interface Summary {
   totalDistanceKm: number;
   roundWins: number;
   winStreak: number;
+  secondPlaces: number;
+  scoreBeforeLast: number | null;
+  lastRoundPoints: number;
   avgPins: number;
   maxPins: number;
   avgPinPathKm: number;
@@ -140,6 +184,8 @@ export interface Summary {
   firstConfirms: number;
   lastConfirms: number;
   lastSecondRounds: number;
+  /** Submitted first and scored the fewest points of the round. */
+  kamikazeRounds: number;
   continentHits: number;
   continentMisses: number;
   favouriteContinent: ContinentCode | null;
@@ -153,6 +199,7 @@ export interface Summary {
   regions: RegionSummary[];
   europe: RegionSummary | null;
   weakestRegion: RegionSummary | null;
+  specialty: Specialty | null;
   biasLat: number;
   biasLng: number;
   panoStepsTotal: number;
@@ -162,6 +209,7 @@ export interface Summary {
   zoomMaxAvg: number;
   zoomEventsAvg: number;
   mapZoomMaxAvg: number;
+  duel: DuelSummary | null;
   nearestRival: Rival | null;
   avgRivalKm: number | null;
   rivalLead: number;
@@ -220,6 +268,15 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     byRegion.set(code, [...(byRegion.get(code) ?? []), r.points]);
   }
   const regions: RegionSummary[] = [...byRegion].map(([code, list]) => ({ code, rounds: list.length, avgPoints: avg(list) }));
+  const strongest = regions.filter((r) => r.rounds >= 2).sort((a, b) => b.avgPoints - a.avgPoints)[0];
+  const elsewhere = strongest ? withGuess.filter((r) => { const a = ctx.actuals.get(r.round); return a && continentOf(a) !== strongest.code; }) : [];
+  const specialty: Specialty | null = strongest
+    ? { ...strongest, elsewhereAvg: avg(elsewhere.map((r) => r.points)), elsewhereRounds: elsewhere.length }
+    : null;
+
+  // Places per round: 1 + everyone who scored more.
+  const placeIn = (r: RoundStat): number => 1 + (ctx.roundPoints.get(r.round) ?? []).filter((p) => p > r.points).length;
+  const lastRound = rounds.find((r) => r.round === ctx.lastRound);
 
   // Points the closest pin would have earned but the submitted one did not.
   const letGos: LetGo[] = withGuess
@@ -229,6 +286,7 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     .sort((a, b) => b.points - a.points)[0] ?? null;
 
   const tele = rounds.map((r) => r.tele);
+  const duel = ctx.duel ? summarizeDuel(entry.playerId, ctx.duel) : null;
 
   return {
     playerId: entry.playerId,
@@ -259,6 +317,9 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
 
     roundWins: rounds.filter((r) => ctx.roundWinners.get(r.round)?.has(entry.playerId)).length,
     winStreak,
+    secondPlaces: withGuess.filter((r) => r.points > 0 && placeIn(r) === 2).length,
+    scoreBeforeLast: ctx.scoreBeforeLast.get(entry.playerId) ?? null,
+    lastRoundPoints: lastRound?.points ?? 0,
 
     avgPins: avg(rounds.map((r) => r.pins)),
     maxPins: Math.max(0, ...rounds.map((r) => r.pins)),
@@ -285,6 +346,10 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     lastSecondRounds: ctx.timeLimitMs
       ? rounds.filter((r) => r.confirmMs !== null && ctx.timeLimitMs - r.confirmMs < 5000).length
       : 0,
+    kamikazeRounds: withGuess.filter((r) => {
+      const all = ctx.roundPoints.get(r.round) ?? [];
+      return r.confirmRank === 1 && all.length >= 2 && r.points === Math.min(...all) && r.points < Math.max(...all);
+    }).length,
 
     continentHits: withGuess.filter((r) => r.continentHit).length,
     continentMisses: withGuess.filter((r) => r.continentHit === false).length,
@@ -299,6 +364,7 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     regions,
     europe: regions.find((r) => r.code === 'EU') ?? null,
     weakestRegion: regions.filter((r) => r.rounds >= 2).sort((a, b) => a.avgPoints - b.avgPoints)[0] ?? null,
+    specialty,
     biasLat: withGuess.length ? avg(withGuess.map((r) => r.bias?.dLat ?? 0)) : 0,
     biasLng: withGuess.length ? avg(withGuess.map((r) => r.bias?.dLng ?? 0)) : 0,
 
@@ -309,12 +375,31 @@ export function summarize(entry: PlayerEntry, ctx: Context): Summary {
     zoomMaxAvg: avg(tele.map((t) => t.zoomMax)),
     zoomEventsAvg: avg(tele.map((t) => t.zoomEvents)),
     mapZoomMaxAvg: avg(tele.map((t) => t.mapZoomMax)),
+    duel,
 
     // Filled by addRivalStats once every summary exists.
     nearestRival: null,
     avgRivalKm: null,
     rivalLead: 1,
   };
+}
+
+function summarizeDuel(playerId: string, log: DuelLog): DuelSummary {
+  let damageTaken = 0;
+  let damageDealt = 0;
+  for (const r of log.rounds) {
+    const own = r.damage.get(playerId);
+    if (own === undefined) continue;
+    damageTaken += own;
+    // Whoever takes no damage set the mark - the damage of the others is theirs.
+    if (own === 0) damageDealt += sum([...r.damage].filter(([id]) => id !== playerId).map(([, d]) => d));
+  }
+  // The game ends with the round that knocked out the last opponent.
+  const last = log.rounds.at(-1);
+  const finalBlow = last?.knockedOut.size && last.damage.get(playerId) === 0 && !last.knockedOut.has(playerId)
+    ? { round: last.round, knockouts: last.knockedOut.size }
+    : null;
+  return { hpLeft: log.hpLeft.get(playerId) ?? 0, damageTaken, damageDealt, finalBlow };
 }
 
 /**
@@ -403,6 +488,26 @@ const CATALOG: Title[] = [
   { id: 'photoFinish', weight: 4,
     test: (s, all) => all.length >= 2 && scoreGap(s, all) > 0 && scoreGap(s, all) < 300,
     facts: (s, all) => [{ key: 'behindFirst', points: scoreGap(s, all) }] },
+  // Behind before the last round, in front after it.
+  { id: 'buzzerBeater', weight: 4,
+    test: (s, all, ctx) => isLastRoundSwing(ctx, all) && s.scoreBeforeLast !== null
+      && scoreGap(s, all) === 0 && s.score > 0 && s.scoreBeforeLast < Math.max(...all.map((x) => x.scoreBeforeLast ?? 0)),
+    facts: (s, all) => [
+      { key: 'behindBeforeLast', points: Math.max(...all.map((x) => x.scoreBeforeLast ?? 0)) - (s.scoreBeforeLast ?? 0) },
+      { key: 'lastRoundPoints', points: s.lastRoundPoints },
+    ] },
+  // Alone in front before the last round - and not in the end.
+  { id: 'choker', weight: 3,
+    test: (s, all, ctx) => isLastRoundSwing(ctx, all) && s.scoreBeforeLast !== null && scoreGap(s, all) > 0
+      && all.every((x) => x.playerId === s.playerId || (x.scoreBeforeLast ?? 0) < s.scoreBeforeLast!),
+    facts: (s, all) => [
+      { key: 'leadBeforeLast', points: s.scoreBeforeLast! - Math.max(...all.filter((x) => x.playerId !== s.playerId).map((x) => x.scoreBeforeLast ?? 0)) },
+      { key: 'lastRoundPoints', points: s.lastRoundPoints },
+      { key: 'behindFirst', points: scoreGap(s, all) },
+    ] },
+  { id: 'eternalSecond', weight: 2,
+    test: (s, all) => s.roundCount >= 3 && s.roundWins === 0 && isTop(s, all, (x) => x.secondPlaces, 2),
+    facts: (s) => [{ key: 'secondPlaces', n: s.secondPlaces }, { key: 'noRoundWin' }] },
   { id: 'unlucky', weight: 2,
     test: (s, all) => all.length >= 2 && s.roundWins === 0 && s.avgDistanceKm !== null
       && s.avgDistanceKm < avg(all.map((x) => x.avgDistanceKm ?? 20000)),
@@ -443,6 +548,14 @@ const CATALOG: Title[] = [
   { id: 'blindSpot', weight: 3,
     test: (s) => s.weakestRegion !== null && s.avgPoints > 800 && s.weakestRegion.avgPoints < s.avgPoints * 0.4,
     facts: (s) => [{ key: 'continentAvg', continent: s.weakestRegion?.code ?? 'SEA', points: s.weakestRegion?.avgPoints ?? 0, n: s.weakestRegion?.rounds ?? 0 }, { key: 'overallAvg', points: s.avgPoints }] },
+  // Unlike Home Advantage any continent, and the rest of the world has to be really bad.
+  { id: 'specialist', weight: 3,
+    test: (s) => s.specialty !== null && s.specialty.avgPoints >= 3500
+      && s.specialty.elsewhereRounds >= 2 && s.specialty.elsewhereAvg < s.specialty.avgPoints * 0.4,
+    facts: (s) => [
+      { key: 'continentAvg', continent: s.specialty?.code ?? 'SEA', points: s.specialty?.avgPoints ?? 0, n: s.specialty?.rounds ?? 0 },
+      { key: 'elsewhereAvg', points: s.specialty?.elsewhereAvg ?? 0, n: s.specialty?.elsewhereRounds ?? 0 },
+    ] },
   { id: 'shadow', weight: 4,
     test: (s) => s.nearestRival !== null && s.nearestRival.avgKm < 600 && s.rivalLead >= 2,
     facts: (s) => [{ key: 'toRivalGuesses', km: s.nearestRival?.avgKm ?? 0, name: s.nearestRival?.name ?? '' }, { key: 'toOtherGuesses', km: km(s.avgRivalKm) }] },
@@ -508,6 +621,9 @@ const CATALOG: Title[] = [
   { id: 'firstOne', weight: 1,
     test: (s, all) => all.length >= 2 && isTop(s, all, (x) => x.firstConfirms, 2),
     facts: (s) => [{ key: 'submittedFirst', n: s.firstConfirms }] },
+  { id: 'kamikaze', weight: 2,
+    test: (s) => s.kamikazeRounds >= 2,
+    facts: (s) => [{ key: 'firstAndWorst', n: s.kamikazeRounds }, { key: 'avgSubmitAfter', ms: s.avgConfirmMs ?? 0 }] },
   { id: 'straggler', weight: 1,
     test: (s, all) => all.length >= 2 && isTop(s, all, (x) => x.lastConfirms, 2),
     facts: (s) => [{ key: 'submittedLast', n: s.lastConfirms }, { key: 'avgSubmitAfter', ms: s.avgConfirmMs ?? 0 }] },
@@ -556,6 +672,21 @@ const CATALOG: Title[] = [
   { id: 'highFlyer', weight: 2,
     test: (s, all) => s.played >= 2 && isBottom(s, all, (x) => x.mapZoomMaxAvg, 4),
     facts: (s) => [{ key: 'maxMapZoomOnly', level: s.mapZoomMaxAvg }] },
+
+  // --- Duel ---
+  { id: 'survivor', weight: 4,
+    test: (s, _all, ctx) => s.duel !== null && s.duel.hpLeft > 0 && s.duel.hpLeft <= ctx.duel!.startHp * 0.1,
+    facts: (s, _all, ctx) => [{ key: 'hpLeft', hp: s.duel?.hpLeft ?? 0, percent: Math.round(((s.duel?.hpLeft ?? 0) / ctx.duel!.startHp) * 100) }] },
+  { id: 'executioner', weight: 2,
+    test: (s) => s.duel?.finalBlow != null,
+    facts: (s) => [{ key: 'decidingRound', n: s.duel?.finalBlow?.round ?? 0 }, { key: 'knockouts', n: s.duel?.finalBlow?.knockouts ?? 0 }] },
+  // Hands it out and takes it: at least half the starting HP each way. Only
+  // alone - in a team everyone takes the same damage.
+  { id: 'glassCannon', weight: 3,
+    test: (s, all, ctx) => s.duel !== null && !ctx.duel!.teams
+      && s.duel.damageTaken >= ctx.duel!.startHp * 0.5 && s.duel.damageDealt >= ctx.duel!.startHp * 0.5
+      && isTop(s, all, (x) => x.duel?.damageDealt ?? 0, 0),
+    facts: (s) => [{ key: 'damageDealt', hp: s.duel?.damageDealt ?? 0 }, { key: 'damageTaken', hp: s.duel?.damageTaken ?? 0 }] },
 ];
 
 /** If nothing stands out - everyone gets a title anyway. */
@@ -667,6 +798,26 @@ export interface FinalStats {
   metrics: MetricRow[];
 }
 
+function prepare(entries: PlayerEntry[], rawCtx: TitleContext): { ctx: Context; all: Summary[]; candidates: Map<string, Title[]> } {
+  const lastRound = Math.max(0, ...entries.flatMap((e) => e.rounds.map((r) => r.round)));
+  const roundPoints = new Map<number, number[]>();
+  for (const e of entries) {
+    for (const r of e.rounds) if (r.guess) roundPoints.set(r.round, [...(roundPoints.get(r.round) ?? []), r.points]);
+  }
+  const scoreBeforeLast = new Map(entries.map((e) => [e.playerId, sum(e.rounds.filter((r) => r.round < lastRound).map((r) => r.points))]));
+  const ctx: Context = { ...rawCtx, confirmCounts: countConfirms(entries), roundPoints, scoreBeforeLast, lastRound };
+  const all = entries.map((e) => summarize(e, ctx));
+  addRivalStats(all);
+  const candidates = new Map(all.map((s) => [s.playerId, CATALOG.filter((t) => matches(t, s, all, ctx))]));
+  return { ctx, all, candidates };
+}
+
+/** Every title a player qualifies for, before the draw - for tests. */
+export function titleCandidates(entries: PlayerEntry[], ctx: TitleContext): Record<string, TitleId[]> {
+  const { candidates } = prepare(entries, ctx);
+  return Object.fromEntries([...candidates].map(([id, list]) => [id, list.map((t) => t.id)]));
+}
+
 /**
  * One title per player plus the statistics table.
  *
@@ -675,11 +826,7 @@ export interface FinalStats {
  * someone else could get at all. `random` is injectable for tests.
  */
 export function buildFinalStats(entries: PlayerEntry[], rawCtx: TitleContext, random: () => number = Math.random): FinalStats {
-  const ctx: Context = { ...rawCtx, confirmCounts: countConfirms(entries) };
-  const all = entries.map((e) => summarize(e, ctx));
-  addRivalStats(all);
-
-  const candidates = new Map(all.map((s) => [s.playerId, CATALOG.filter((t) => matches(t, s, all, ctx))]));
+  const { ctx, all, candidates } = prepare(entries, rawCtx);
   const order = [...all].sort((a, b) => candidates.get(a.playerId)!.length - candidates.get(b.playerId)!.length);
 
   const used = new Set<TitleId>();

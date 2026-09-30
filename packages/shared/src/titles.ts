@@ -4,16 +4,18 @@
 export const TITLE_GROUPS = {
   accuracy: ['sharpshooter', 'bullseye', 'precision', 'globetrotter'],
   form: ['roundKing', 'streak', 'rock', 'rollerCoaster', 'oneHitWonder', 'comeback',
-    'onTheRise', 'lateBloomer', 'fastStarter', 'photoFinish', 'unlucky', 'blank'],
+    'onTheRise', 'lateBloomer', 'fastStarter', 'photoFinish', 'buzzerBeater', 'choker', 'unlucky',
+    'eternalSecond', 'blank'],
   geography: ['antipode', 'aroundTheWorld', 'continentalDrift', 'seafarer', 'homebody',
     'regular', 'dejaVu', 'polarExplorer', 'tropical', 'homeAdvantage', 'blindSpot', 'shadow',
-    'loneWolf', 'northernLight', 'southerner', 'eastward', 'westward'],
+    'loneWolf', 'northernLight', 'southerner', 'eastward', 'westward', 'specialist'],
   map: ['luckyGuess', 'homingIn', 'oneClickWonder', 'anchor', 'undecided', 'changeOfHeart', 'coldFeet', 'gutFeeling'],
   timing: ['snapDecision', 'efficiency', 'metronome', 'lastSecond', 'ponderer', 'warmUp',
-    'firstOne', 'straggler', 'ghost'],
+    'firstOne', 'kamikaze', 'straggler', 'ghost'],
   streetview: ['explorer', 'marathon', 'lost', 'returner', 'homebodyPano', 'detective',
     'zoomJunkie', 'signReader', 'carousel', 'panoramaPhotographer', 'tunnelVision', 'cartographer',
     'highFlyer'],
+  duel: ['survivor', 'executioner', 'glassCannon'],
   /** Fallbacks when nothing stands out - everyone gets a title. */
   note: ['solid', 'unremarkable', 'wanderer'],
 } as const;
@@ -47,6 +49,10 @@ export interface FactParams {
   firstHalf: { points: number };
   secondHalf: { points: number };
   behindFirst: { points: number };
+  behindBeforeLast: { points: number };
+  leadBeforeLast: { points: number };
+  lastRoundPoints: { points: number };
+  secondPlaces: { n: number };
   noRoundWin: object;
   under100: { n: number };
   worstGuessOff: { km: number };
@@ -62,6 +68,7 @@ export interface FactParams {
   maxFromEquator: { deg: number };
   continentAvg: { continent: string; points: number; n: number };
   overallAvg: { points: number };
+  elsewhereAvg: { points: number; n: number };
   toRivalGuesses: { km: number; name: string };
   toOtherGuesses: { km: number };
   tooFarNorth: { deg: number };
@@ -87,6 +94,7 @@ export interface FactParams {
   untilFirstPin: { ms: number };
   submittedFirst: { n: number };
   submittedLast: { n: number };
+  firstAndWorst: { n: number };
   roundsWithoutGuess: { n: number };
   stepsPerRound: { n: number };
   stepsPerRoundFine: { n: number };
@@ -102,6 +110,11 @@ export interface FactParams {
   maxMapZoom: { level: number };
   maxMapZoomOnly: { level: number };
   guessesSubmitted: { n: number };
+  hpLeft: { hp: number; percent: number };
+  decidingRound: { n: number };
+  knockouts: { n: number };
+  damageDealt: { hp: number };
+  damageTaken: { hp: number };
 }
 export type FactKey = keyof FactParams;
 export type Fact = { [K in FactKey]: { key: K } & FactParams[K] }[FactKey];
