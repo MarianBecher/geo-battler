@@ -172,10 +172,10 @@ function orchestraSounds(ctx: AudioContext, orch: Orchestra, fx: Bus): EffectTab
       hit('cymbal', 'soft', 0, 0.45);
     },
 
-    /** New chat message - two marimba notes, more a tap than a signal. */
+    /** New chat message - two glockenspiel notes, clear enough to be heard over the reveal music. */
     chat: () => {
-      n('marimba', 81, 0, 0.4, 0.32);
-      n('marimba', 86, 0.07, 0.5, 0.28);
+      n('glockenspiel', 88, 0, 0.6, 0.6);
+      n('glockenspiel', 93, 0.09, 0.8, 0.55);
     },
 
     /** Guess submitted - a short harp glissando upwards. */

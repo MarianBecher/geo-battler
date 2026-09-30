@@ -113,8 +113,8 @@ export const SYNTH: EffectTable = {
     else tone({ freq: 523, duration: 0.12, type: 'triangle', gain: 0.28 });
   },
 
-  /** New chat message - two quiet notes, more a tap on the shoulder than a signal. */
-  chat: () => { sequence([[880, 0, 0.05], [1175, 0.05, 0.07]], { type: 'sine', gain: 0.06 }); },
+  /** New chat message - two short notes, loud enough to notice. */
+  chat: () => { sequence([[1319, 0, 0.08], [1760, 0.08, 0.16]], { type: 'triangle', gain: 0.2 }); },
 
   /** Guess submitted. */
   submit: () => { sequence([[523, 0, 0.09], [784, 0.06, 0.14]], { type: 'triangle', gain: 0.16 }); },

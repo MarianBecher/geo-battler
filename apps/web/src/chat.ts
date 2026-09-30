@@ -14,7 +14,8 @@ const FLOATING = new Set(['screen-reveal', 'screen-final']);
 const HISTORY = 60;
 let unread = 0;
 
-const chatOpenPref = (): boolean => storage.get(CHAT_OPEN_KEY) === '1';
+/** Open unless closed on purpose - the reveal is where people react. */
+const chatOpenPref = (): boolean => storage.get(CHAT_OPEN_KEY) !== '0';
 
 export function setChatOpen(open: boolean): void {
   const chat = $('chat');
