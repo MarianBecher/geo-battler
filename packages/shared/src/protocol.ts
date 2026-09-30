@@ -288,8 +288,9 @@ export interface ClientConfig {
 /** GET /api/hall */
 export interface HallRecords {
   bestGame?: { name: string; score: number; rounds: number; at: string };
-  bestRound?: { name: string; points: number; place: string | null; at: string };
   bestGuess?: { name: string; distanceKm: number; place: string | null; at: string };
+  /** Most wins in a row, on any pack and in any mode. `live`: the holder has not lost since. */
+  bestStreak?: { name: string; wins: number; from: string; to: string; live: boolean };
 }
 
 export interface HallPlayer {
@@ -300,8 +301,10 @@ export interface HallPlayer {
   rounds: number;
   avgPoints: number;
   bestGameScore: number;
-  bestRoundPoints: number;
   bestDistanceKm: number | null;
+  /** Wins in a row right now, and the most ever. */
+  streak: number;
+  bestStreak: number;
   perfects: number;
   continentHits: number;
   favouriteTitle: string | null;

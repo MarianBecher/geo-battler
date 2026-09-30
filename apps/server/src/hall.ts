@@ -1,8 +1,8 @@
 // Hall of Fame - the only thing that survives a server restart.
 //
 // Rooms live in memory and are gone after the evening. What should remain
-// are the records: the best guess of all time, who won the most games, how
-// often someone landed a perfect hit. That is what turns single games into a
+// are the records: the best guess of all time, who won the most games in a
+// row, how often someone landed a perfect hit. That is what turns single games into a
 // running rivalry.
 //
 // Storage is a single JSON file. No schema, no database - for a handful of
@@ -78,13 +78,19 @@ interface HallPlayerRecord {
   perfects: number;
   continentHits: number;
   bestGameScore: number;
-  bestRoundPoints: number;
   bestDistanceKm: number | null;
+  /** Wins in a row: the running count, when it started, and the longest ever. */
+  streak: number;
+  streakSince: string | null;
+  bestStreak: number;
   /** title id -> how often it was awarded */
   titles: Partial<Record<TitleId, number>>;
   lastSeen: string | null;
   history: CompactRound[];
 }
+
+/** Whether a streak is still alive is derived at view time, not stored. */
+type StoredRecords = Omit<HallRecords, 'bestStreak'> & { bestStreak?: Omit<NonNullable<HallRecords['bestStreak']>, 'live'> };
 
 interface HallData {
   version: number;
@@ -92,7 +98,7 @@ interface HallData {
   rounds: number;
   updatedAt: string | null;
   players: Record<string, HallPlayerRecord>;
-  records: HallRecords;
+  records: StoredRecords;
 }
 
 const emptyHall = (): HallData => ({ version: VERSION, games: 0, rounds: 0, updatedAt: null, players: {}, records: {} });
@@ -101,7 +107,7 @@ const keyOf = (name: string): string => name.replace(/\s+/g, ' ').trim().toLower
 
 const emptyPlayer = (name: string): HallPlayerRecord => ({
   name, games: 0, wins: 0, rounds: 0, points: 0, worldRounds: 0, guesses: 0, perfects: 0, continentHits: 0,
-  bestGameScore: 0, bestRoundPoints: 0, bestDistanceKm: null, titles: {}, lastSeen: null, history: [],
+  bestGameScore: 0, bestDistanceKm: null, streak: 0, streakSince: null, bestStreak: 0, titles: {}, lastSeen: null, history: [],
 });
 
 /** ~10 m - the map needs no more. */
@@ -153,7 +159,14 @@ export class Hall {
   async read(): Promise<HallData> {
     try {
       const raw = JSON.parse(await fs.readFile(this.file, 'utf8')) as Partial<HallData>;
-      if (raw.version === VERSION) return { ...emptyHall(), ...raw };
+      if (raw.version === VERSION) {
+        const data = { ...emptyHall(), ...raw };
+        // Fields added since the file was written start at their defaults.
+        for (const [id, p] of Object.entries(data.players)) data.players[id] = { ...emptyPlayer(p.name), ...p };
+        // "Best round" was dropped - it was always the best guess in points.
+        delete (data.records as { bestRound?: unknown }).bestRound;
+        return data;
+      }
       // Leave an older format alone rather than misreading it.
       console.warn(`[hall] ${this.file} has version ${String(raw.version)} - ignored.`);
     } catch (err) {
@@ -202,8 +215,10 @@ export class Hall {
     this.data = await this.read();
 
     const at = new Date(summary.at).toISOString();
-    // A win against yourself is none.
-    const winners = summary.players.length > 1 ? new Set(summary.winners) : new Set<string>();
+    // A win against yourself is none - and a loss against yourself neither,
+    // so a solo game leaves the streak alone.
+    const contested = summary.players.length > 1;
+    const winners = contested ? new Set(summary.winners) : new Set<string>();
     // A duel lasts as long as it lasts - its point total cannot be compared
     // with a game over a fixed number of rounds.
     const comparable = summary.mode !== 'duel';
@@ -228,7 +243,15 @@ export class Hall {
         entry.points += player.score;
       }
       entry.lastSeen = at;
-      if (winners.has(player.name)) entry.wins++;
+      if (winners.has(player.name)) {
+        entry.wins++;
+        entry.streak++;
+        if (entry.streak === 1) entry.streakSince = at;
+        entry.bestStreak = Math.max(entry.bestStreak, entry.streak);
+      } else if (contested) {
+        entry.streak = 0;
+        entry.streakSince = null;
+      }
       if (comparable && worldwide) entry.bestGameScore = Math.max(entry.bestGameScore, player.score);
       if (player.title) entry.titles[player.title] = (entry.titles[player.title] ?? 0) + 1;
 
@@ -236,7 +259,6 @@ export class Hall {
         if (round.actual) entry.history.push(compactRound({ ...round, actual: round.actual }, at, summary.mode));
         if (round.points >= MAX_POINTS) entry.perfects++;
         if (round.continentHit) entry.continentHits++;
-        if (worldwide) entry.bestRoundPoints = Math.max(entry.bestRoundPoints, round.points);
         if (round.distanceKm !== null) {
           entry.guesses++;
           if (worldwide && (entry.bestDistanceKm === null || round.distanceKm < entry.bestDistanceKm)) entry.bestDistanceKm = round.distanceKm;
@@ -246,7 +268,7 @@ export class Hall {
       if (entry.history.length > HISTORY_LIMIT) entry.history.splice(0, entry.history.length - HISTORY_LIMIT);
 
       this.data.players[id] = entry;
-      this.updateRecords(player, at, comparable && worldwide, worldwide);
+      this.updateRecords(player, entry, at, comparable && worldwide, worldwide);
     }
 
     this.data.updatedAt = at;
@@ -256,10 +278,18 @@ export class Hall {
   /**
    * The three records that hold across all evenings. `gameComparable`: the
    * point total may compete for the best game; `roundComparable`: single
-   * rounds may compete for the best guess and the best round.
+   * rounds may compete for the best guess. The win streak competes always -
+   * a win is a win on every pack. Ties leave the record with whoever set it.
+   *
+   * There is deliberately no "best round" - points are a function of the
+   * distance, so it would always be the same round as the best guess.
    */
-  private updateRecords(player: GameSummary['players'][number], at: string, gameComparable: boolean, roundComparable: boolean): void {
+  private updateRecords(player: GameSummary['players'][number], entry: HallPlayerRecord, at: string, gameComparable: boolean, roundComparable: boolean): void {
     const records = this.data.records;
+
+    if (entry.streak > (records.bestStreak?.wins ?? 0) && entry.streakSince) {
+      records.bestStreak = { name: player.name, wins: entry.streak, from: entry.streakSince, to: at };
+    }
 
     if (gameComparable && (!records.bestGame || player.score > records.bestGame.score)) {
       records.bestGame = { name: player.name, score: player.score, rounds: player.rounds.length, at };
@@ -267,9 +297,6 @@ export class Hall {
 
     if (!roundComparable) return;
     for (const round of player.rounds) {
-      if (!records.bestRound || round.points > records.bestRound.points) {
-        records.bestRound = { name: player.name, points: round.points, place: round.place, at };
-      }
       if (round.distanceKm === null) continue;
       if (!records.bestGuess || round.distanceKm < records.bestGuess.distanceKm) {
         records.bestGuess = { name: player.name, distanceKm: round.distanceKm, place: round.place, at };
@@ -292,8 +319,9 @@ export class Hall {
           rounds: p.rounds,
           avgPoints: p.worldRounds ? p.points / p.worldRounds : 0,
           bestGameScore: p.bestGameScore,
-          bestRoundPoints: p.bestRoundPoints,
           bestDistanceKm: p.bestDistanceKm,
+          streak: p.streak,
+          bestStreak: p.bestStreak,
           perfects: p.perfects,
           continentHits: p.continentHits,
           favouriteTitle,
@@ -304,7 +332,11 @@ export class Hall {
       })
       .sort((a, b) => b.wins - a.wins || b.avgPoints - a.avgPoints || a.name.localeCompare(b.name));
 
-    return { games: this.data.games, rounds: this.data.rounds, updatedAt: this.data.updatedAt, records: this.data.records, players };
+    const { bestStreak, ...rest } = this.data.records;
+    const holder = bestStreak && this.data.players[keyOf(bestStreak.name)];
+    const records: HallRecords = bestStreak ? { ...rest, bestStreak: { ...bestStreak, live: holder?.streak === bestStreak.wins } } : rest;
+
+    return { games: this.data.games, rounds: this.data.rounds, updatedAt: this.data.updatedAt, records, players };
   }
 
   /** A player's personal stats, or null if the name is unknown. */

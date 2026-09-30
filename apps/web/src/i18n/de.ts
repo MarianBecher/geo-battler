@@ -263,6 +263,7 @@ export const de: Dictionary = {
   'hall.player': 'Spieler',
   'hall.games': 'Partien',
   'hall.wins': 'Siege',
+  'hall.streak': 'Serie',
   'hall.avgPerRound': 'Ø Punkte/Runde',
   'hall.bestGame': 'Beste Partie',
   'hall.bestGuess': 'Bester Tipp',
@@ -270,8 +271,11 @@ export const de: Dictionary = {
   'hall.favouriteTitle': 'Lieblingstitel',
   'hall.personalStats': 'Persönliche Auswertung',
   'hall.record.bestGuess': 'Bester Tipp aller Zeiten',
-  'hall.record.bestRound': 'Beste Runde',
   'hall.record.bestGame': 'Beste Partie',
+  'hall.record.bestStreak': 'Längste Siegesserie',
+  'hall.winsInARow': { one: 'Sieg in Folge', other: 'Siege in Folge' },
+  'hall.streakLive': 'läuft noch · seit {date}',
+  'hall.streakSpan': '{from} – {to}',
   'hall.overRounds': 'über {rounds}',
 
   // --- Persönliche Auswertung ---

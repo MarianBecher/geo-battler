@@ -263,6 +263,7 @@ export const en = {
   'hall.player': 'Player',
   'hall.games': 'Games',
   'hall.wins': 'Wins',
+  'hall.streak': 'Streak',
   'hall.avgPerRound': 'Avg. points/round',
   'hall.bestGame': 'Best game',
   'hall.bestGuess': 'Best guess',
@@ -270,8 +271,11 @@ export const en = {
   'hall.favouriteTitle': 'Favourite title',
   'hall.personalStats': 'Personal stats',
   'hall.record.bestGuess': 'Best guess of all time',
-  'hall.record.bestRound': 'Best round',
   'hall.record.bestGame': 'Best game',
+  'hall.record.bestStreak': 'Longest win streak',
+  'hall.winsInARow': { one: 'win in a row', other: 'wins in a row' },
+  'hall.streakLive': 'still running · since {date}',
+  'hall.streakSpan': '{from} – {to}',
   'hall.overRounds': 'over {rounds}',
 
   // --- Personal stats ---

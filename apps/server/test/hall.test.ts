@@ -46,7 +46,47 @@ describe('Hall', () => {
     expect(view.players[0]).toMatchObject({ wins: 1, perfects: 1, avgPoints: 4500, favouriteTitle: 'sharpshooter', hasProfile: true, face: 7 });
     expect(view.records.bestGuess).toMatchObject({ name: 'Ada', distanceKm: 0.01, place: 'Berlin, Germany' });
     expect(view.records.bestGame).toMatchObject({ name: 'Ada', score: 9000, rounds: 2 });
-    expect(view.records.bestRound).toMatchObject({ name: 'Ada', points: 5000 });
+    expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 1, live: true });
+  });
+
+  it('counts wins in a row on every pack, breaks the streak on a loss and ignores solo games', async () => {
+    const later = (h: number, over: Partial<GameSummary> = {}) => summary({ at: Date.parse('2026-09-26T18:00:00Z') + h * 3600_000, ...over });
+    await hall.record(later(0));
+    await hall.record(later(1, { settings: { ...DEFAULT_SETTINGS, pack: 'dach' } }));
+    await hall.record(later(2, { mode: 'duel' }));
+    // Alone at the table: neither a win nor a loss.
+    await hall.record(later(3, { players: [summary().players[1]!], winners: ['Bob'] }));
+    let view = await hall.view();
+    expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 3, from: '2026-09-26T18:00:00.000Z', to: '2026-09-26T20:00:00.000Z', live: true });
+    expect(view.players.find((p) => p.name === 'Ada')).toMatchObject({ streak: 3, bestStreak: 3 });
+    expect(view.players.find((p) => p.name === 'Bob')).toMatchObject({ streak: 0, bestStreak: 0 });
+
+    await hall.record(later(4, { winners: ['Bob'] }));
+    view = await hall.view();
+    expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 3, live: false });
+    expect(view.players.find((p) => p.name === 'Ada')).toMatchObject({ streak: 0, bestStreak: 3 });
+    expect(view.players.find((p) => p.name === 'Bob')).toMatchObject({ streak: 1, bestStreak: 1 });
+  });
+
+  it('leaves the streak record with whoever set it on a tie', async () => {
+    await hall.record(summary());
+    await hall.record(summary({ winners: ['Bob'] }));
+    expect((await hall.view()).records.bestStreak).toMatchObject({ name: 'Ada', wins: 1, live: false });
+  });
+
+  it('reads an older file without streak fields', async () => {
+    await hall.record(summary());
+    const raw = JSON.parse(await fs.readFile(hall.file, 'utf8')) as { players: Record<string, Record<string, unknown>>; records: Record<string, unknown> };
+    for (const p of Object.values(raw.players)) { delete p.streak; delete p.streakSince; delete p.bestStreak; }
+    delete raw.records.bestStreak;
+    raw.records.bestRound = { name: 'Ada', points: 5000, place: null, at: '2026-09-26T18:00:00.000Z' };
+    await fs.writeFile(hall.file, JSON.stringify(raw));
+    const view = await hall.view();
+    expect('bestRound' in view.records).toBe(false);
+    expect(view.records.bestStreak).toBeUndefined();
+    expect(view.players[0]).toMatchObject({ streak: 0, bestStreak: 0 });
+    await hall.record(summary({ at: Date.parse('2026-09-27T18:00:00Z') }));
+    expect((await hall.view()).records.bestStreak).toMatchObject({ name: 'Ada', wins: 1 });
   });
 
   it('lets a duel set round records but not the best game', async () => {
@@ -56,10 +96,12 @@ describe('Hall', () => {
     expect(records.bestGuess).toMatchObject({ name: 'Ada' });
   });
 
-  it('keeps small map packs out of every record and the average', async () => {
+  it('keeps small map packs out of the guess and game records and the average', async () => {
     await hall.record(summary({ settings: { ...DEFAULT_SETTINGS, pack: 'europe' } }));
     const view = await hall.view();
-    expect(view.records).toEqual({});
+    expect(view.records.bestGuess).toBeUndefined();
+    expect(view.records.bestGame).toBeUndefined();
+    expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 1 });
     expect(view.players[0]!.avgPoints).toBe(0);
     expect(view.players[0]!.games).toBe(1);
   });

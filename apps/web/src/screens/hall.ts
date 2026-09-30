@@ -4,6 +4,7 @@
 import { MAX_POINTS, type HallView, type HttpError, type PlayerProfile, type TitleId } from '@geo-battler/shared';
 import { $, escapeHtml } from '../dom.ts';
 import { countryName, fmtDate, fmtNum, t } from '../i18n/index.ts';
+import type { MessageKey } from '../i18n/index.ts';
 import { continentName, errorText, km, mrzPad, mrzText, titleName } from '../format.ts';
 import { INKS, WorldMap, inkLabel } from '../maps/worldmap.ts';
 import { photo } from '../photo.ts';
@@ -29,23 +30,37 @@ export async function openHall(): Promise<void> {
 
 export const closeHall = (): void => { $('hall-overlay').hidden = true; };
 
-function recordCard(label: string, value: string, who: string, where: string | null): string {
+/** `unit` sits small after the value; `live` marks a record that is still being extended. */
+function recordCard(label: string, value: string, who: string, where: string | null, opts: { unit?: string; live?: boolean } = {}): string {
   return `<div class="hall-record">
     <p class="label">${escapeHtml(label)}</p>
-    <p class="value">${escapeHtml(value)}</p>
+    <p class="value">${escapeHtml(value)}${opts.unit ? ` <small>${escapeHtml(opts.unit)}</small>` : ''}</p>
     <p class="who">${escapeHtml(who)}</p>
-    ${where ? `<p class="where">${escapeHtml(where)}</p>` : ''}
+    ${where ? `<p class="where${opts.live ? ' live' : ''}">${escapeHtml(where)}</p>` : ''}
   </div>`;
 }
 
-const COLUMNS: [keyof typeof import('../i18n/en.ts').en & `hall.${string}`, (p: HallView['players'][number]) => string][] = [
+type HallPlayer = HallView['players'][number];
+const streakLive = (p: HallPlayer): boolean => p.streak > 0 && p.streak === p.bestStreak;
+
+/** Column label, cell text, and an optional class on the cell. */
+const COLUMNS: [MessageKey & `hall.${string}`, (p: HallPlayer) => string, ((p: HallPlayer) => string)?][] = [
   ['hall.games', (p) => String(p.games)],
   ['hall.wins', (p) => String(p.wins)],
+  ['hall.streak', (p) => String(p.bestStreak), (p) => (streakLive(p) ? 'streak-live' : '')],
   ['hall.avgPerRound', (p) => fmtNum(Math.round(p.avgPoints))],
   ['hall.bestGame', (p) => fmtNum(p.bestGameScore)],
   ['hall.bestGuess', (p) => km(p.bestDistanceKm)],
   ['hall.perfects', (p) => String(p.perfects)],
 ];
+
+/** "still running · since 12.09.26" or the span it covered; a single day is named once. */
+function streakWhere(s: NonNullable<HallView['records']['bestStreak']>): string {
+  if (s.live) return t('hall.streakLive', { date: fmtDate(s.from) });
+  const from = fmtDate(s.from);
+  const to = fmtDate(s.to);
+  return from === to ? from : t('hall.streakSpan', { from, to });
+}
 
 function renderHall(data: HallView): void {
   $('hall-sub').textContent = data.games ? `${t('games', { n: data.games })} · ${t('rounds', { n: data.rounds })}` : t('hall.sub');
@@ -53,8 +68,8 @@ function renderHall(data: HallView): void {
   const r = data.records;
   $('hall-records').innerHTML = [
     r.bestGuess && recordCard(t('hall.record.bestGuess'), km(r.bestGuess.distanceKm), r.bestGuess.name, r.bestGuess.place),
-    r.bestRound && recordCard(t('hall.record.bestRound'), t('points', { n: fmtNum(r.bestRound.points) }), r.bestRound.name, r.bestRound.place),
     r.bestGame && recordCard(t('hall.record.bestGame'), t('points', { n: fmtNum(r.bestGame.score) }), r.bestGame.name, t('hall.overRounds', { rounds: t('rounds', { n: r.bestGame.rounds }) })),
+    r.bestStreak && recordCard(t('hall.record.bestStreak'), String(r.bestStreak.wins), r.bestStreak.name, streakWhere(r.bestStreak), { unit: t('hall.winsInARow', { n: r.bestStreak.wins }), live: r.bestStreak.live }),
   ].filter((x): x is string => typeof x === 'string').join('');
 
   if (!data.players.length) {
@@ -67,7 +82,7 @@ function renderHall(data: HallView): void {
     <th scope="row"><span class="rank-col">${i < 3 ? `<span class="stamp rank-stamp rank-${i + 1}">${i + 1}</span>` : i + 1}</span>${p.hasProfile
       ? `<button class="name-link" data-profile="${escapeHtml(p.name)}" title="${escapeHtml(t('hall.personalStats'))}">${escapeHtml(p.name)}</button>`
       : escapeHtml(p.name)}</th>
-    ${COLUMNS.map(([, pick]) => `<td>${escapeHtml(pick(p))}</td>`).join('')}
+    ${COLUMNS.map(([, pick, cls]) => `<td${cls?.(p) ? ` class="${cls(p)}"` : ''}>${escapeHtml(pick(p))}</td>`).join('')}
     <td class="title-cell">${p.favouriteTitle ? escapeHtml(titleName(p.favouriteTitle as TitleId)) + (p.favouriteTitleCount > 1 ? ` (${p.favouriteTitleCount}×)` : '') : '-'}</td>
   </tr>`).join('');
   $('hall-table').innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;

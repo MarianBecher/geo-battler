@@ -2117,7 +2117,20 @@ input::placeholder { color: #6a768e; }
 .hall-records .hall-record:nth-child(3) { --tilt: -1deg; color: #2b3f6b; animation-delay: .28s; }
 .hall-records .hall-record .label { color: inherit; font-family: var(--display); font-size: 15px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .hall-records .hall-record .value { color: inherit; }
+.hall-records .hall-record .value small { font-size: 18px; font-weight: 800; letter-spacing: .02em; }
 .hall-records .hall-record .who { color: var(--ink); }
+/* A green dot: this streak is still running - the next game can extend or end it. */
+.hall-record .where.live::before, .stats-table td.streak-live::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  vertical-align: 1px;
+}
+.hall-record .where.live::before { margin-right: 5px; }
+.stats-table td.streak-live::after { margin-left: 6px; }
 
 .rank-col { display: inline-block; width: 30px; margin-right: 6px; text-align: center; color: var(--ink-2); font-weight: 700; }
 .rank-stamp { font-size: 17px; padding: 0 7px; --tilt: -6deg; }

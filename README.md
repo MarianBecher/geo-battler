@@ -317,10 +317,11 @@ the press of a button. Not linked anywhere, open it directly.
 ## Hall of Fame
 
 After every finished game the server writes the records to `data/hall.json`
-(elsewhere via `HALL_FILE`): best guess of all time, best round, best game,
-and per player games, wins, average, perfect hits and the favourite title.
-Records and averages only count on the world map - on a small pack every
-guess is closer. A click on a name opens the personal stats: a printed world
+(elsewhere via `HALL_FILE`): best guess of all time, best game, longest win
+streak, and per player games, wins, streak, average, perfect hits and the
+favourite title. Guess and game records and the averages only count on the
+world map - on a small pack every guess is closer. The streak counts on every
+pack; a solo game neither extends nor breaks it. A click on a name opens the personal stats: a printed world
 map of all targets, strengths by continent and country, and the form over
 the last 30 games. Players are recognised by name (lower-cased). Writes go
 through a temporary file and `rename`.
