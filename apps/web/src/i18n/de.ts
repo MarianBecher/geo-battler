@@ -237,7 +237,7 @@ export const de: Dictionary = {
   // --- Chat ---
   'chat.title': 'Chat',
   'chat.empty': 'Noch keine Nachrichten. Schreib was, bis alle bereit sind.',
-  'chat.placeholder': 'Nachricht schreiben',
+  'chat.placeholder': 'Nachricht schreiben - :shrug: geht auch',
   'chat.message': 'Nachricht',
   'chat.send': 'Senden',
 

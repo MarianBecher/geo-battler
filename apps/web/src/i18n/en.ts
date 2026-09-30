@@ -237,7 +237,7 @@ export const en = {
   // --- Chat ---
   'chat.title': 'Chat',
   'chat.empty': 'No messages yet. Say something while everyone gets ready.',
-  'chat.placeholder': 'Write a message',
+  'chat.placeholder': 'Write a message - :shrug: works too',
   'chat.message': 'Message',
   'chat.send': 'Send',
 

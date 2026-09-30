@@ -2300,9 +2300,48 @@ input::placeholder { color: #6a768e; }
   text-align: center;
 }
 
-.chat-form { display: flex; gap: 8px; }
+.chat-form { position: relative; display: flex; gap: 8px; }
 .chat-form input { flex: 1; min-width: 0; height: 44px; }
 .chat-form .btn { flex: 0 0 auto; }
+
+/* Emoji are line drawings in the ink of the page, sized to the text. */
+.chat-text .glyph { width: 1.35em; height: 1.35em; vertical-align: -.35em; }
+/* A message of nothing but emoji is shown big - like a stamp slapped on. */
+.chat-log li.big .chat-text .glyph { width: 36px; height: 36px; vertical-align: -12px; margin-right: 2px; }
+
+/* The emoji slip: a paper strip over the input while a :shortcode: is typed,
+   perforated at the edge like a page torn out of a stamp booklet. */
+.chat-emoji {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--paper-raise);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 24px -10px rgba(5, 10, 24, .55);
+  background-image: radial-gradient(circle at 0 50%, transparent 3px, var(--paper-raise) 3.5px);
+  background-size: 8px 8px;
+  background-repeat: repeat-y;
+}
+.chat-emoji li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px 5px 16px;
+  cursor: pointer;
+  font-size: 15px;
+}
+.chat-emoji li + li { border-top: 1px dashed var(--rule-soft); }
+.chat-emoji li.active, .chat-emoji li:hover { background: var(--marker); }
+.chat-emoji-char { flex: 0 0 auto; display: inline-flex; }
+.chat-emoji-char .glyph { width: 22px; height: 22px; }
+.chat-emoji-code { font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--ink-2); }
+.chat-emoji li.active .chat-emoji-code { color: var(--ink-on-marker); }
 
 /* Round results and final standings: floats bottom left over the map - above
    the Google logo so that stays visible. */
