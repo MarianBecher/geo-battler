@@ -799,6 +799,7 @@ export class Room {
 
       const stat = player.roundStat ?? emptyRoundStat(round);
       closeRoundStat(stat, { guess: result.guess, actual, distance: result.distanceKm, points: result.points });
+      if (result.guess && stat.trail.length >= 2) result.trail = stat.trail;
       player.stats.push(stat);
       player.roundStat = null;
 

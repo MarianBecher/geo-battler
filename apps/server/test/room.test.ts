@@ -197,6 +197,42 @@ describe('a classic game', () => {
     expect(room.gameSummary().players.map((p) => p.rounds.length)).toEqual([2, 2]);
   });
 
+  it('sends the way of every pin with the reveal, nudges merged', async () => {
+    const { room, ada, bob } = lobby();
+    await startGame(room);
+
+    room.setPin(ada.id, TOKYO.lat, TOKYO.lng);
+    room.setPin(ada.id, PARIS.lat, PARIS.lng);
+    room.setPin(ada.id, PARIS.lat + 0.001, PARIS.lng); // a nudge of ~100 m
+    room.submitGuess(ada.id, BERLIN.lat, BERLIN.lng);
+    room.submitGuess(bob.id, PARIS.lat, PARIS.lng);
+
+    const results = room.lastRoundResults!.results;
+    const trail = results.find((r) => r.playerId === ada.id)!.trail!;
+    const expected = [TOKYO, { lat: PARIS.lat + 0.001, lng: PARIS.lng }, BERLIN];
+    expect(trail).toHaveLength(expected.length);
+    trail.forEach((p, i) => {
+      expect(p.lat).toBeCloseTo(expected[i]!.lat, 6);
+      expect(p.lng).toBeCloseTo(expected[i]!.lng, 6);
+    });
+    // One pin is no way at all.
+    expect(results.find((r) => r.playerId === bob.id)!.trail).toBeUndefined();
+  });
+
+  it('thins a long way out to a dozen stops, first and last kept', async () => {
+    const { room, ada, bob } = lobby();
+    await startGame(room);
+
+    for (let i = 0; i < 40; i++) room.setPin(ada.id, 10 + i, 20);
+    room.submitGuess(ada.id, 60, 20);
+    room.submitGuess(bob.id, PARIS.lat, PARIS.lng);
+
+    const trail = room.lastRoundResults!.results.find((r) => r.playerId === ada.id)!.trail!;
+    expect(trail).toHaveLength(12);
+    expect(trail[0]).toMatchObject({ lat: 10, lng: 20 });
+    expect(trail.at(-1)).toMatchObject({ lat: 60, lng: 20 });
+  });
+
   it('refuses pins during the countdown and while paused', async () => {
     const { room, ada } = lobby();
     room.updateSettings(ada.id, { rounds: 1 });

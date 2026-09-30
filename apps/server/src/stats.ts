@@ -5,7 +5,7 @@
 // anyway (every click travels here immediately); the Street View numbers
 // arrive from the client as telemetry.
 
-import { distanceKm, signedLngDelta, type ContinentCode, type LatLng, type Telemetry } from '@geo-battler/shared';
+import { distanceKm, signedLngDelta, type ContinentCode, type LatLng, type Telemetry, type TrailPoint } from '@geo-battler/shared';
 import { continentOf } from './continents.ts';
 
 export interface RoundStat {
@@ -26,6 +26,8 @@ export interface RoundStat {
   moveKm: number;
   /** The closest any pin of the round came to the target. */
   closestPinKm: number | null;
+  /** The pin's way for the reveal: nudges merged, thinned to TRAIL_MAX when the round closes. */
+  trail: TrailPoint[];
   confirmMs: number | null;
   /** 1 = submitted first. */
   confirmRank: number | null;
@@ -43,7 +45,7 @@ export function emptyTelemetry(): Telemetry {
 export function emptyRoundStat(round: number): RoundStat {
   return {
     round, points: 0, distanceKm: null, guess: null, pins: 0, pinPathKm: 0,
-    firstPin: null, firstPinMs: null, lastPin: null, lastPinMs: null, lastAdjustKm: null, moveKm: 0, closestPinKm: null,
+    firstPin: null, firstPinMs: null, lastPin: null, lastPinMs: null, lastAdjustKm: null, moveKm: 0, closestPinKm: null, trail: [],
     confirmMs: null, confirmRank: null, continentHit: null, guessContinent: null, bias: null,
     tele: emptyTelemetry(),
   };
@@ -65,6 +67,26 @@ export function sanitizeTelemetry(raw: unknown): Telemetry {
   return out;
 }
 
+/** A pin moved by less than this counts as a nudge: it replaces the last stop of the trail. */
+const TRAIL_MERGE_KM = 1;
+/** Stops of a trail in the reveal - more would only turn the map into a scribble. */
+export const TRAIL_MAX = 12;
+
+/** Keeps `max` points spread evenly over the list, the first and the last always among them. */
+export function thinOut<T>(points: readonly T[], max: number): T[] {
+  if (points.length <= max) return [...points];
+  return Array.from({ length: max }, (_, i) => points[Math.round(i * (points.length - 1) / (max - 1))]!);
+}
+
+function extendTrail(trail: TrailPoint[], point: LatLng, ms: number): void {
+  const prev = trail.at(-1);
+  // A nudge keeps the time the pin arrived there, only the spot moves.
+  if (prev && distanceKm(prev, point) < TRAIL_MERGE_KM) trail[trail.length - 1] = { ...point, ms: prev.ms };
+  else trail.push({ ...point, ms });
+  // A client clicking like mad must not grow the list without end.
+  if (trail.length > 8 * TRAIL_MAX) trail.splice(0, trail.length, ...thinOut(trail, 2 * TRAIL_MAX));
+}
+
 /** Every pin placed - including corrections, those are the interesting ones. */
 export function recordPin(stat: RoundStat, pin: LatLng, elapsedMs: number, actual: LatLng | null): void {
   const point = { lat: pin.lat, lng: pin.lng };
@@ -80,6 +102,7 @@ export function recordPin(stat: RoundStat, pin: LatLng, elapsedMs: number, actua
     stat.firstPin = point;
     stat.firstPinMs = elapsedMs;
   }
+  extendTrail(stat.trail, point, elapsedMs);
   stat.pins++;
   stat.lastPin = point;
   stat.lastPinMs = elapsedMs;
@@ -91,6 +114,7 @@ export function closeRoundStat(stat: RoundStat, outcome: { guess: LatLng | null;
   stat.points = outcome.points;
   stat.distanceKm = outcome.distance;
   stat.guess = outcome.guess;
+  stat.trail = thinOut(stat.trail, TRAIL_MAX);
   if (!outcome.guess) return stat;
 
   stat.guessContinent = continentOf(outcome.guess);

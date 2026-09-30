@@ -5,7 +5,7 @@
 // ignores the JSON `styles` the passport look is built from. So the old
 // marker stays, behind one helper that carries the deprecation note.
 
-import type { LatLng, PinSnapshot, PlayedRound, RoundResult, Settings, Telemetry } from '@geo-battler/shared';
+import type { LatLng, PinSnapshot, PlayedRound, RoundResult, Settings, Telemetry, TrailPoint } from '@geo-battler/shared';
 import { fmtNum, t } from '../i18n/index.ts';
 
 declare global {
@@ -673,10 +673,51 @@ export class RevealMap extends OverlayMap {
         strokeOpacity: 0.85,
         strokeWeight: 2,
       }));
+
+      if (r.trail && r.trail.length >= 2) {
+        for (const p of r.trail) bounds.extend(p);
+        this.addTrail(r.trail, r.color);
+      }
     }
 
     if (!bounds.isEmpty()) fitCapped(this.map, bounds, 70);
   }
+
+  /** The pin's way: a dashed line in the player's colour, a dot on every stop before the last. */
+  private addTrail(trail: readonly TrailPoint[], color: string): void {
+    const line = new google.maps.Polyline({
+      map: this.map,
+      path: [...trail],
+      strokeOpacity: 0,
+      icons: [dashes(color)],
+      zIndex: 1,
+    });
+    const dots = trail.slice(0, -1).map((p) => marker({
+      map: this.map,
+      position: p,
+      clickable: false,
+      zIndex: 2,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 5,
+        fillColor: '#f4f8f3',
+        fillOpacity: 1,
+        strokeColor: color,
+        strokeOpacity: 0.9,
+        strokeWeight: 2.5,
+      },
+    }));
+    this.overlays.push(line, ...dots);
+  }
+}
+
+/** A dashed stroke - Google has none, so a short line symbol repeats along the polyline. */
+function dashes(color: string): google.maps.IconSequence {
+  return {
+    icon: { path: 'M 0,-1 0,1', strokeColor: color, strokeOpacity: 0.8, strokeWeight: 3, scale: 3 },
+    offset: '0',
+    repeat: '12px',
+  };
 }
 
 // --- Final map -----------------------------------------------------------

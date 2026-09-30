@@ -146,6 +146,11 @@ export interface RoundMessage {
   pins?: PinSnapshot[];
 }
 
+/** One stop of a pin's way through the round, `ms` after the round started. */
+export interface TrailPoint extends LatLng {
+  ms: number;
+}
+
 export interface RoundResult {
   playerId: string;
   name: string;
@@ -163,6 +168,12 @@ export interface RoundResult {
   hpBefore?: number;
   knockedOut?: boolean;
   team?: TeamId;
+  /**
+   * Where the pin went before it ended up at `guess`, the last point being the
+   * guess itself. Only for two or more stops, and only with the reveal - during
+   * the round nobody sees where the others have been.
+   */
+  trail?: TrailPoint[];
 }
 
 export interface TeamRoundResult {
