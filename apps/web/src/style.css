@@ -2322,6 +2322,133 @@ input::placeholder { color: #6a768e; }
 /* A message of nothing but emoji is shown big - like a stamp slapped on. */
 .chat-log li.big .chat-text .glyph { width: 36px; height: 36px; vertical-align: -12px; margin-right: 2px; }
 
+/* Emoji move a little, in the log and on the slip, flip-book style: each
+   keyframe is held until the next (steps), so the drawing jumps between a
+   few poses instead of gliding. The moving parts are the `a` groups in
+   emoji.ts; at rest every drawing is its plain picture. Neighbouring emoji
+   start at different points so three fires don't flicker in lockstep. */
+.glyph .wink-shut { opacity: 0; }
+.glyph .a {
+  transform-box: view-box;
+  animation-iteration-count: infinite;
+  animation-timing-function: steps(1, end);
+  animation-delay: var(--d, 0s);
+}
+.chat-text .glyph:nth-of-type(3n+2) { --d: -.45s; }
+.chat-text .glyph:nth-of-type(3n+3) { --d: -1.1s; }
+.chat-emoji li:nth-child(3n+2) .glyph { --d: -.45s; }
+.chat-emoji li:nth-child(3n+3) .glyph { --d: -1.1s; }
+
+.glyph .blink { animation-name: emoji-blink; animation-duration: 3.6s; transform-origin: 12px 10px; }
+@keyframes emoji-blink { 0%, 88% { transform: none } 91% { transform: scaleY(.15) } 95%, 100% { transform: none } }
+.glyph .wink-shut { animation-name: emoji-wink-shut; animation-duration: 3s; }
+.glyph .wink-open { animation-name: emoji-wink-open; animation-duration: 3s; }
+@keyframes emoji-wink-shut { 0%, 55% { opacity: 0 } 60%, 85% { opacity: 1 } 90%, 100% { opacity: 0 } }
+@keyframes emoji-wink-open { 0%, 55% { opacity: 1 } 60%, 85% { opacity: 0 } 90%, 100% { opacity: 1 } }
+.glyph .shake { animation-name: emoji-shake; animation-duration: .6s; transform-origin: 12px 12px; }
+@keyframes emoji-shake { 0%, 100% { transform: rotate(-6deg) } 50% { transform: rotate(6deg) } }
+.glyph .tears { animation-name: emoji-tears; animation-duration: .9s; }
+@keyframes emoji-tears { 0%, 100% { transform: none; opacity: 1 } 33% { transform: translateY(1.3px) } 66% { transform: translateY(2.6px); opacity: .4 } }
+.glyph .nod { animation-name: emoji-nod; animation-duration: 1.6s; transform-origin: 12px 21px; }
+@keyframes emoji-nod { 0%, 100% { transform: none } 50% { transform: rotate(-7deg) translateY(.4px) } }
+.glyph .gasp { animation-name: emoji-gasp; animation-duration: 1.2s; transform-origin: 12px 15.5px; }
+@keyframes emoji-gasp { 0%, 100% { transform: none } 50% { transform: scale(1.35) } }
+.glyph .brow { animation-name: emoji-brow; animation-duration: 1.6s; transform-origin: 15px 7px; }
+@keyframes emoji-brow { 0%, 100% { transform: none } 50% { transform: translateY(-1.3px) rotate(-8deg) } }
+.glyph .drip { animation-name: emoji-drip; animation-duration: 1.2s; }
+@keyframes emoji-drip { 0%, 100% { transform: none; opacity: 1 } 33% { transform: translateY(1.5px) } 66% { transform: translateY(3px); opacity: .3 } }
+.glyph .fume { animation-name: emoji-fume; animation-duration: .24s; }
+@keyframes emoji-fume { 0%, 100% { transform: translateX(-.5px) } 50% { transform: translateX(.5px) } }
+.glyph .slap { animation-name: emoji-slap; animation-duration: 2.4s; transform-origin: 13px 20px; }
+@keyframes emoji-slap { 0% { transform: translate(2.5px, 1.5px) rotate(10deg) } 12% { transform: translate(1px, .5px) rotate(4deg) } 22%, 100% { transform: none } }
+.glyph .chatter { animation-name: emoji-chatter; animation-duration: .5s; transform-origin: 12px 20px; }
+@keyframes emoji-chatter { 0%, 100% { transform: rotate(-4deg) } 50% { transform: rotate(4deg) } }
+.glyph .float { animation-name: emoji-float; animation-duration: 1.6s; transform-origin: 12px 12px; }
+@keyframes emoji-float { 0%, 100% { transform: rotate(-3deg) } 50% { transform: translateY(-1.6px) rotate(3deg) } }
+.glyph .look { animation-name: emoji-look; animation-duration: 3s; }
+@keyframes emoji-look { 0%, 30% { transform: none } 35%, 65% { transform: translateX(-2px) } 70%, 100% { transform: none } }
+.glyph .shrug-arms { animation-name: emoji-shrug-arms; animation-duration: 1.8s; transform-origin: 12px 11px; }
+@keyframes emoji-shrug-arms { 0%, 30%, 100% { transform: none } 40%, 75% { transform: scaleY(1.35) } }
+.glyph .shrug-head { animation-name: emoji-shrug-head; animation-duration: 1.8s; }
+@keyframes emoji-shrug-head { 0%, 30%, 100% { transform: none } 40%, 75% { transform: translateY(.9px) } }
+.glyph .thumb-up { animation-name: emoji-thumb-up; animation-duration: 1s; transform-origin: 5.5px 20px; }
+@keyframes emoji-thumb-up { 0%, 100% { transform: none } 50% { transform: rotate(-12deg) } }
+.glyph .thumb-down { animation-name: emoji-thumb-down; animation-duration: 1s; transform-origin: 5.5px 4px; }
+@keyframes emoji-thumb-down { 0%, 100% { transform: none } 50% { transform: rotate(12deg) } }
+.glyph .wave-hand { animation-name: emoji-wave-hand; animation-duration: .7s; transform-origin: 12px 20px; }
+@keyframes emoji-wave-hand { 0%, 100% { transform: rotate(-12deg) } 50% { transform: rotate(12deg) } }
+.glyph .wave-lines { animation-name: emoji-wave-lines; animation-duration: .7s; }
+@keyframes emoji-wave-lines { 0%, 100% { opacity: 1 } 50% { opacity: 0 } }
+.glyph .beat { animation-name: emoji-beat; animation-duration: 1.2s; transform-origin: 12px 13px; }
+@keyframes emoji-beat { 0%, 30%, 60%, 100% { transform: none } 15% { transform: scale(1.16) } 45% { transform: scale(1.1) } }
+.glyph .flame-out { animation-name: emoji-flame-out; animation-duration: .5s; transform-origin: 12px 21px; }
+@keyframes emoji-flame-out { 0%, 100% { transform: none } 33% { transform: scaleY(1.08) skewX(-4deg) } 66% { transform: scaleY(.95) skewX(4deg) } }
+.glyph .flame-in { animation-name: emoji-flame-in; animation-duration: .4s; transform-origin: 12px 21px; }
+@keyframes emoji-flame-in { 0%, 100% { transform: scaleY(.88) } 50% { transform: scaleY(1.12) skewX(3deg) } }
+.glyph .underline { stroke-dasharray: 1; animation-name: emoji-underline; animation-duration: 2s; }
+@keyframes emoji-underline { 0% { stroke-dashoffset: 1 } 15% { stroke-dashoffset: .66 } 30% { stroke-dashoffset: .33 } 45%, 100% { stroke-dashoffset: 0 } }
+.glyph .popper { animation-name: emoji-popper; animation-duration: 1.6s; transform-origin: 4px 20px; }
+@keyframes emoji-popper { 0%, 100% { transform: none } 15% { transform: rotate(-9deg) } 30% { transform: none } }
+.glyph .streamers { animation-name: emoji-streamers; animation-duration: 1.6s; transform-origin: 11px 13px; }
+@keyframes emoji-streamers { 0% { transform: scale(.35); opacity: 0 } 15% { transform: scale(.75); opacity: 1 } 30% { transform: scale(1) } 60% { transform: scale(1.15); opacity: 1 } 85%, 100% { transform: scale(1.25); opacity: 0 } }
+.glyph .wobble { animation-name: emoji-wobble; animation-duration: 1.2s; transform-origin: 12px 20px; }
+@keyframes emoji-wobble { 0%, 100% { transform: rotate(-4deg) } 50% { transform: rotate(4deg) } }
+.glyph .bob { animation-name: emoji-bob; animation-duration: 1.2s; }
+@keyframes emoji-bob { 0%, 100% { transform: none } 50% { transform: translateY(-1.2px) } }
+.glyph .swing { animation-name: emoji-swing; animation-duration: 1.4s; transform-origin: 12px 3px; }
+@keyframes emoji-swing { 0%, 100% { transform: rotate(-10deg) } 50% { transform: rotate(10deg) } }
+.glyph .dart-in { animation-name: emoji-dart-in; animation-duration: 2.4s; }
+@keyframes emoji-dart-in { 0% { transform: translate(7px, -7px); opacity: 0 } 12% { transform: translate(3.5px, -3.5px); opacity: 1 } 24%, 100% { transform: none } }
+.glyph .z1 { animation-name: emoji-z1; animation-duration: 2s; }
+.glyph .z2 { animation-name: emoji-z2; animation-duration: 2s; }
+.glyph .z3 { animation-name: emoji-z3; animation-duration: 2s; }
+@keyframes emoji-z1 { 0%, 80% { opacity: 1 } 85%, 100% { opacity: 0 } }
+@keyframes emoji-z2 { 0%, 25% { opacity: 0 } 30%, 80% { opacity: 1 } 85%, 100% { opacity: 0 } }
+@keyframes emoji-z3 { 0%, 50% { opacity: 0 } 55%, 80% { opacity: 1 } 85%, 100% { opacity: 0 } }
+.glyph .jitter { animation-name: emoji-jitter; animation-duration: .2s; }
+@keyframes emoji-jitter { 0%, 100% { transform: translate(.3px, 0) } 50% { transform: translate(-.3px, -.3px) } }
+.glyph .thrust { animation-name: emoji-thrust; animation-duration: .2s; transform-origin: 12px 18.5px; }
+@keyframes emoji-thrust { 0%, 100% { transform: none } 50% { transform: scaleY(1.8) } }
+.glyph .spin { animation-name: emoji-spin; animation-duration: 1.6s; transform-origin: 12px 12px; }
+.glyph .spin-late { animation-delay: calc(var(--d, 0s) - .8s); }
+@keyframes emoji-spin { 0% { transform: scaleX(.05) } 25% { transform: scaleX(.8) } 50% { transform: scaleX(1.6) } 75% { transform: scaleX(2.25); opacity: .5 } 100% { transform: scaleX(2.25); opacity: 0 } }
+.glyph .needle { animation-name: emoji-needle; animation-duration: 2.4s; transform-origin: 12px 12px; }
+@keyframes emoji-needle { 0% { transform: rotate(-28deg) } 15% { transform: rotate(16deg) } 30% { transform: rotate(-7deg) } 45%, 100% { transform: none } }
+.glyph .drop { animation-name: emoji-drop; animation-duration: 2s; }
+@keyframes emoji-drop { 0% { transform: translateY(-4px) } 12% { transform: none } 20% { transform: translateY(-1.2px) } 28%, 100% { transform: none } }
+.glyph .stamp-down { animation-name: emoji-stamp-down; animation-duration: 1.4s; }
+@keyframes emoji-stamp-down { 0%, 100% { transform: translateY(-3px) } 40%, 55% { transform: none } }
+.glyph .focus { animation-name: emoji-focus; animation-duration: 1.4s; transform-origin: 12px 13px; }
+@keyframes emoji-focus { 0%, 100% { transform: none } 50% { transform: scale(.75) } }
+.glyph .fly { animation-name: emoji-fly; animation-duration: 1.4s; transform-origin: 12px 12px; }
+@keyframes emoji-fly { 0%, 100% { transform: none } 50% { transform: translate(.6px, -1.2px) rotate(-4deg) } }
+.glyph .rock { animation-name: emoji-rock; animation-duration: 1.6s; transform-origin: 12px 18px; }
+@keyframes emoji-rock { 0%, 100% { transform: rotate(-5deg) } 50% { transform: rotate(5deg) } }
+.glyph .rumble { animation-name: emoji-rumble; animation-duration: .3s; }
+@keyframes emoji-rumble { 0%, 100% { transform: none } 50% { transform: translateY(-.6px) } }
+.glyph .sway { animation-name: emoji-sway; animation-duration: 1.8s; transform-origin: 11px 21px; }
+@keyframes emoji-sway { 0%, 100% { transform: rotate(-5deg) } 50% { transform: rotate(4deg) } }
+.glyph .sway-small { animation-name: emoji-sway-small; animation-duration: 2s; transform-origin: 12px 21px; }
+@keyframes emoji-sway-small { 0%, 100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+.glyph .rays { animation-name: emoji-rays; animation-duration: 1s; transform-origin: 12px 12px; }
+@keyframes emoji-rays { 0% { transform: none } 33% { transform: rotate(15deg) } 66% { transform: rotate(30deg) } 100% { transform: rotate(45deg) } }
+.glyph .fall { animation-name: emoji-fall; animation-duration: .75s; }
+@keyframes emoji-fall { 0% { transform: translate(.3px, -1.5px); opacity: 0 } 33% { transform: none; opacity: 1 } 66% { transform: translate(-.3px, 1.5px); opacity: 1 } 100% { transform: translate(-.6px, 3px); opacity: 0 } }
+.glyph .twirl { animation-name: emoji-twirl; animation-duration: 1.5s; transform-origin: 12px 12px; }
+@keyframes emoji-twirl { 0% { transform: none } 33% { transform: rotate(20deg) } 66% { transform: rotate(40deg) } 100% { transform: rotate(60deg) } }
+.glyph .draw { stroke-dasharray: 1; animation-name: emoji-draw; animation-duration: 2.4s; }
+.glyph .draw-2 { animation-delay: calc(var(--d, 0s) + .2s); }
+.glyph .draw-3 { animation-delay: calc(var(--d, 0s) + .4s); }
+@keyframes emoji-draw { 0% { stroke-dashoffset: 1 } 12% { stroke-dashoffset: .5 } 24%, 85% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: -1 } }
+.glyph .roll { animation-name: emoji-roll; animation-duration: 1.2s; }
+@keyframes emoji-roll { 0% { transform: none } 25% { transform: translateX(-2.5px) } 50% { transform: translateX(-5px) } 75% { transform: translateX(-7.5px) } 100% { transform: translateX(-10px) } }
+.glyph .flutter { animation-name: emoji-flutter; animation-duration: .8s; transform-origin: 5px 8px; }
+@keyframes emoji-flutter { 0%, 100% { transform: none } 50% { transform: skewY(-6deg) scaleX(.94) } }
+.glyph .flip { animation-name: emoji-flip; animation-duration: 3s; transform-origin: 12px 12px; }
+@keyframes emoji-flip { 0%, 70% { transform: none } 78% { transform: rotate(90deg) } 86%, 100% { transform: rotate(180deg) } }
+.glyph .waddle { animation-name: emoji-waddle; animation-duration: .8s; transform-origin: 12px 21px; }
+@keyframes emoji-waddle { 0%, 100% { transform: rotate(-7deg) } 50% { transform: rotate(7deg) } }
+
 /* The emoji slip: a paper strip over the input while a :shortcode: is typed,
    perforated at the edge like a page torn out of a stamp booklet. */
 .chat-emoji {
@@ -2635,7 +2762,8 @@ input::placeholder { color: #6a768e; }
   .result-list li, .result-list .pts .stamp,
   .podium li, .podium li .title-stamp,
   .win-stamp.press, .final-side.thud,
-  .stamp.press { animation: none !important; }
+  .stamp.press,
+  .glyph .a { animation: none !important; }
   .passport, .pp-cover, .pp-inner > * { transition: none !important; }
   .home-stamp.on { opacity: 1; }
   .btn, .swatch, .guess-box, .guess-map, .guess-resize, .mode-switch button, .hp > span { transition: none; }
