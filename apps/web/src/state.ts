@@ -14,8 +14,7 @@ export interface AppState {
   round: RoundMessage | null;
   /** The pin on the map right now. */
   guess: LatLng | null;
-  /** The pin as it was last submitted. */
-  submittedPin: LatLng | null;
+  /** Marked ready - the pin can still move. */
   submitted: boolean;
   /** Only watching this round (joined late or out of the duel). */
   spectating: boolean;
@@ -45,7 +44,6 @@ export const state: AppState = {
   room: null,
   round: null,
   guess: null,
-  submittedPin: null,
   submitted: false,
   spectating: false,
   spectatorReason: null,

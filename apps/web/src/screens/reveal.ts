@@ -23,7 +23,6 @@ export function showReveal(msg: RevealMessage, show: () => void): void {
 
   // The round state falls away here - the next round brings its own.
   state.guess = null;
-  state.submittedPin = null;
   state.submitted = false;
 
   revealMap ??= new RevealMap($('reveal-map'));

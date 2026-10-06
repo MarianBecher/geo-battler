@@ -41,14 +41,14 @@ hundred games a month (see [What it costs](#what-it-costs)).
 * **Classic, Duel, Team duel** - points over fixed rounds, or hit points
   until one player or one team is left standing
 * **Everyone sees the same panorama** and starts on the same 3-2-1 countdown
-* **A round ends** when everyone has submitted or time runs out. Until then
-  the pin can be moved and submitted again; on timeout the last pin counts
+* **A round ends** when everyone is ready or time runs out. The last pin
+  always counts - it can be moved while ready, and the ready can be taken back
 * **The reveal** shows all pins on one map, names the place, and counts the
   GeoGuessr score up: `5000 * e^(-10 * d / 14916.862)`, max. 5,000 per round
 * **Music and sound** - a travel waltz in the lobby, quiet strings while
   guessing, pizzicato ticking in the last ten seconds, a timpani roll and a
   stamp for the reveal, then the country's anthem
-* **Keyboard shortcuts** - space submits, `M` keeps the map open, `R` takes
+* **Keyboard shortcuts** - space marks you ready (or takes it back), `M` keeps the map open, `R` takes
   you back to the starting point
 * **Final standings with a world map** - all targets and all guesses at a
   glance, filterable by round, plus a title per player and a statistics table

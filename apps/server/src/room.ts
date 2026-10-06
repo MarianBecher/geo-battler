@@ -175,7 +175,6 @@ export class Room {
   private emptySince: number | null = Date.now();
   private loadError: LoadError | null = null;
   private roundStartedAt: number | null = null;
-  private confirmCount = 0;
   private finalStatsCache: FinalStats | null = null;
   /** Counts games - so a late top-up does not land in the next one. */
   private gameId = 0;
@@ -734,7 +733,6 @@ export class Room {
     this.lastRoundResults = null;
     // Time only runs after the countdown - for the stats as well.
     this.roundStartedAt = Date.now() + COUNTDOWN_MS;
-    this.confirmCount = 0;
     this.clearReady();
     for (const p of this.players.values()) {
       // Classic: whoever watched so far joins in. Not in a duel: entering a running game with full HP would be unfair.
@@ -783,22 +781,30 @@ export class Room {
     if (player?.roundStat) player.roundStat.tele = sanitizeTelemetry(raw);
   }
 
-  /** Submit. Adjusting stays allowed while the round runs - it ends anyway once everyone has submitted. */
+  /** Ready: the pin can still move and the last one counts - the round ends once everyone is ready. */
   submitGuess(playerId: string, lat: number, lng: number): void {
     const player = this.requirePlaying(playerId);
     player.pin = normalizePin(lat, lng);
     if (player.roundStat) {
       recordPin(player.roundStat, player.pin, this.elapsedMs(), this.currentLocation());
-      if (!player.confirmed) {
-        player.roundStat.confirmMs = this.elapsedMs();
-        player.roundStat.confirmRank = ++this.confirmCount;
-      }
+      if (!player.confirmed) player.roundStat.confirmMs = this.elapsedMs();
     }
     player.confirmed = true;
 
     this.events.onPins();
     this.events.onChange();
     if (this.contenders().every((p) => p.confirmed)) this.endRound();
+  }
+
+  /** Takes the ready back. The pin stays where it is. */
+  withdrawGuess(playerId: string): void {
+    const player = this.requirePlaying(playerId);
+    if (!player.confirmed) return;
+    player.confirmed = false;
+    if (player.roundStat) player.roundStat.confirmMs = null;
+
+    this.events.onPins();
+    this.events.onChange();
   }
 
   private requirePlaying(playerId: string): Player {
@@ -820,6 +826,12 @@ export class Room {
     if (!actual) return;
     const round = this.roundIndex + 1;
     const duel = this.isDuel();
+
+    // Order of the final ready - taken back and readied again counts at the later time.
+    [...this.players.values()]
+      .flatMap((p) => (p.roundStat && p.roundStat.confirmMs !== null ? [p.roundStat] : []))
+      .sort((a, b) => a.confirmMs! - b.confirmMs!)
+      .forEach((stat, i) => { stat.confirmRank = i + 1; });
 
     // Spectators did not play this round - knocked-out duellists stay in the list, they appear there as "out".
     const scored = [...this.players.values()].filter((p) => !p.spectator).map((player) => {

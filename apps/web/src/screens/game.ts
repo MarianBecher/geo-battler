@@ -52,7 +52,7 @@ export function renderHudPlayers(room: RoomSnapshot): void {
     <li class="${p.hasGuessed ? 'done' : ''} ${p.connected ? '' : 'off'} ${isMe(p.id) ? 'me' : ''} ${out ? 'out' : ''} ${team ? 'in-team' : ''}" ${team ? `style="--team:${team.color}"` : ''} title="${escapeHtml(title)}">
       ${photo(p.name, p.color, p.face)}
       <span class="name">${escapeHtml(p.name)}</span>
-      ${p.hasGuessed ? `<span class="stamp stamp-ok hud-check ${fresh ? 'press' : ''}" aria-label="${escapeHtml(t('game.submitted'))}">✓</span>` : ''}
+      ${p.hasGuessed ? `<span class="stamp stamp-ok hud-check ${fresh ? 'press' : ''}" aria-label="${escapeHtml(t('ready'))}">✓</span>` : ''}
       ${duel && !out && !team ? hpBar(p.hp, room.settings.hp, p.color) : ''}
       ${out && !team ? `<span class="ko">${t('hp.out')}</span>` : ''}
     </li>`;
@@ -66,30 +66,26 @@ function guessedCount(): { done: number; total: number } {
   return { done: players.filter((p) => p.hasGuessed).length, total: players.length };
 }
 
-const samePin = (a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null): boolean =>
-  !!a && !!b && Math.abs(a.lat - b.lat) < 1e-9 && Math.abs(a.lng - b.lng) < 1e-9;
-
-/** Button and status line of the guess map. Submitting is not final. */
+/** Button and status line of the guess map. The last pin always counts - the button only says "ready" and can be taken back. */
 export function updateGuessControls(): void {
   const btn = $<HTMLButtonElement>('btn-guess');
   const status = $('guess-status');
   const hasPin = !!state.guess;
-  const changed = hasPin && !samePin(state.guess, state.submittedPin);
+  const { done, total } = guessedCount();
 
-  btn.disabled = !hasPin || (state.submitted && !changed);
-  btn.textContent = !hasPin ? t('game.placePin') : !state.submitted ? t('game.submit') : changed ? t('game.updateGuess') : t('game.submitted');
-  btn.classList.toggle('is-done', state.submitted && !changed);
+  btn.disabled = !hasPin;
+  btn.textContent = !hasPin ? t('game.placePin') : state.submitted ? t('ready.waitingFor', { n: total - done }) : t('ready');
+  btn.classList.toggle('is-done', state.submitted);
 
   status.classList.toggle('done', state.submitted);
   status.classList.toggle('out', amOut());
   status.classList.toggle('watch', state.spectating);
-  const { done, total } = guessedCount();
   if (state.spectating && state.spectatorReason) {
     status.hidden = false;
     status.textContent = `${t(`spectator.${state.spectatorReason}`)} ${t('game.submittedCount', { done, total })}`;
   } else if (state.submitted) {
     status.hidden = false;
-    status.textContent = changed ? t('game.pinMoved') : `${t('game.submittedCount', { done, total })} ${t('game.canStillMove')}`;
+    status.textContent = `${t('game.submittedCount', { done, total })} ${t('game.canStillMove')}`;
   } else if (hasPin) {
     status.hidden = false;
     status.textContent = t('game.pinCountsOnTimeout');
@@ -120,7 +116,6 @@ export function startRound(msg: RoundMessage, show: () => void): void {
   // After a reload the server sends the player's own state along.
   state.guess = msg.myPin ? { lat: msg.myPin.lat, lng: msg.myPin.lng } : null;
   state.submitted = !!msg.myConfirmed;
-  state.submittedPin = state.submitted ? state.guess : null;
   state.clockOffset = msg.now - Date.now();
 
   show();
@@ -389,11 +384,15 @@ export function initGame(): void {
 
   $('btn-guess').addEventListener('click', () => {
     if (!state.guess || state.spectating) return;
-    sfx.play('submit');
-    state.submitted = true;
-    state.submittedPin = state.guess;
-    sendTelemetry(); // save the state before submitting
-    send({ t: 'guess', lat: state.guess.lat, lng: state.guess.lng });
+    if (state.submitted) {
+      state.submitted = false;
+      send({ t: 'unguess' });
+    } else {
+      sfx.play('submit');
+      state.submitted = true;
+      sendTelemetry(); // save the state before submitting
+      send({ t: 'guess', lat: state.guess.lat, lng: state.guess.lng });
+    }
     updateGuessControls();
   });
 

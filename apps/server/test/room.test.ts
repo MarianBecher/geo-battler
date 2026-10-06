@@ -267,6 +267,26 @@ describe('a classic game', () => {
     expect(results.find((r) => r.playerId === bob.id)!.trail).toBeUndefined();
   });
 
+  it('lets a player take the ready back - the round waits, the last pin counts', async () => {
+    const { room, ada, bob } = lobby();
+    await startGame(room);
+
+    room.submitGuess(ada.id, TOKYO.lat, TOKYO.lng);
+    await vi.advanceTimersByTimeAsync(1000);
+    room.withdrawGuess(ada.id);
+    room.submitGuess(bob.id, PARIS.lat, PARIS.lng);
+    expect(room.phase).toBe('playing'); // Ada is no longer ready
+
+    await vi.advanceTimersByTimeAsync(1000);
+    room.setPin(ada.id, BERLIN.lat, BERLIN.lng);
+    room.submitGuess(ada.id, BERLIN.lat, BERLIN.lng);
+    expect(room.phase).toBe('reveal');
+    expect(room.lastRoundResults!.results.find((r) => r.playerId === ada.id)!.points).toBe(5000);
+    // The rank follows the final ready: Bob was first.
+    expect(room.players.get(bob.id)!.stats[0]!.confirmRank).toBe(1);
+    expect(room.players.get(ada.id)!.stats[0]!.confirmRank).toBe(2);
+  });
+
   it('thins a long way out to a dozen stops, first and last kept', async () => {
     const { room, ada, bob } = lobby();
     await startGame(room);

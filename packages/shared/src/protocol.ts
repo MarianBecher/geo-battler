@@ -33,6 +33,7 @@ export type ClientMessage =
   | { t: 'start' }
   | { t: 'pin'; lat: number; lng: number }
   | { t: 'guess'; lat: number; lng: number }
+  | { t: 'unguess' }
   | { t: 'telemetry'; stats: Partial<Telemetry> }
   | { t: 'ready'; value: boolean }
   | { t: 'vote'; flag: VoteFlag; value: boolean | null }

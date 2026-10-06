@@ -204,6 +204,7 @@ function createHandlers(manager: RoomManager, hall: Hall): Handlers {
 
     pin(conn, msg) { conn.requireRoom().setPin(conn.requireId(), Number(msg.lat), Number(msg.lng)); },
     guess(conn, msg) { conn.requireRoom().submitGuess(conn.requireId(), Number(msg.lat), Number(msg.lng)); },
+    unguess(conn) { conn.requireRoom().withdrawGuess(conn.requireId()); },
     telemetry(conn, msg) { conn.requireRoom().recordTelemetry(conn.requireId(), msg.stats); },
     async ready(conn, msg) { await conn.requireRoom().setReady(conn.requireId(), !!msg.value); },
 
