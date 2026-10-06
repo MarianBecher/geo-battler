@@ -189,6 +189,7 @@ export const en = {
   'game.spectator': '&#9737; Spectator',
   'game.return': '&#8635; Start',
   'game.returnTitle': 'Back to the starting point of the round (R)',
+  'game.compassTitle': 'Compass - click to face north (N)',
   'game.pause': '&#10074;&#10074; Pause',
   'game.pauseTitle': 'Pause the round',
   'game.paused': 'Paused',

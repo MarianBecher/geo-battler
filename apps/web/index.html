@@ -306,6 +306,20 @@
 <section class="screen" id="screen-game">
   <div id="pano"></div>
   <div id="pano-lock" hidden></div>
+  <!-- Turns with the view; a click looks north (unless No Pan). -->
+  <button class="compass" id="btn-compass" data-i18n-title="game.compassTitle">
+    <svg class="compass-rose" id="compass-rose" viewBox="-50 -50 100 100" aria-hidden="true">
+      <circle class="compass-ring" r="46"/>
+      <g class="compass-ticks">
+        <path d="M46 0h-7M0 46v-7M-46 0h7"/>
+        <path d="M32.5 -32.5l-4 4M32.5 32.5l-4 -4M-32.5 32.5l4 -4M-32.5 -32.5l4 4"/>
+      </g>
+      <path class="compass-north" d="M0 -24L7 0H-7z"/>
+      <path class="compass-south" d="M0 24L7 0H-7z"/>
+      <circle class="compass-hub" r="3"/>
+      <text class="compass-n" y="-35">N</text>
+    </svg>
+  </button>
 
   <div class="hud">
     <div class="hud-chip" id="hud-round">Round 1/5</div>

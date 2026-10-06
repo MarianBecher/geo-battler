@@ -189,6 +189,7 @@ export const de: Dictionary = {
   'game.spectator': '&#9737; Zuschauer',
   'game.return': '&#8635; Startpunkt',
   'game.returnTitle': 'Zurück zum Startpunkt der Runde (R)',
+  'game.compassTitle': 'Kompass - Klick schaut nach Norden (N)',
   'game.pause': '&#10074;&#10074; Pause',
   'game.pauseTitle': 'Runde anhalten',
   'game.paused': 'Pause',

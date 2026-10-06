@@ -12,6 +12,7 @@ const SHORTCUTS: Record<string, string> = {
   ' ': 'btn-guess',      // submit
   m: 'btn-pin-map',      // keep the map open
   r: 'btn-pano-home',    // back to the start
+  n: 'btn-compass',      // face north
 };
 
 export function initKeyboard(opts: { inCountdown: () => boolean; closeStats: () => void; closeHall: () => void }): void {

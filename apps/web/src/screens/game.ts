@@ -97,7 +97,11 @@ export function updateGuessControls(): void {
 // --- The round ---------------------------------------------------------------------
 
 function ensureMaps(): { pano: PanoView; map: GuessMap } {
-  panoView ??= new PanoView($('pano'), $('pano-lock'));
+  if (!panoView) {
+    panoView = new PanoView($('pano'), $('pano-lock'));
+    const rose = $('compass-rose');
+    panoView.onHeading = (heading) => { rose.style.transform = `rotate(${-heading}deg)`; };
+  }
   guessMap ??= new GuessMap($('guess-map'), (pos) => {
     state.guess = pos;
     // The server remembers the pin so it counts when time runs out.
@@ -126,6 +130,7 @@ export function startRound(msg: RoundMessage, show: () => void): void {
   mult.hidden = !((msg.multiplier ?? 1) > 1);
   mult.textContent = t('game.damageFactor', { factor: multiplierText(msg.multiplier ?? 1) });
   $('btn-pano-home').hidden = msg.settings.noMove;
+  $<HTMLButtonElement>('btn-compass').disabled = msg.settings.noPan;
   $('hud-modes').innerHTML = [
     msg.settings.pack !== 'world' && escapeHtml(packName(msg.settings.pack)),
     msg.settings.noMove && 'NM',
@@ -381,6 +386,7 @@ export function initGame(): void {
   initResize();
 
   $('btn-pano-home').addEventListener('click', () => panoView?.returnToStart());
+  $('btn-compass').addEventListener('click', () => panoView?.faceNorth());
 
   $('btn-guess').addEventListener('click', () => {
     if (!state.guess || state.spectating) return;

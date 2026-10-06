@@ -234,6 +234,9 @@ export class PanoView {
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private rebuilds = 0;
   private jumpingHome = false;
+  private turning = 0;
+  /** Called with the view direction in degrees whenever it changes - for the compass. */
+  onHeading: ((heading: number) => void) | null = null;
   /** Play behaviour, see trackTelemetry(). */
   tele: PanoTelemetry = emptyPanoTelemetry();
 
@@ -254,6 +257,7 @@ export class PanoView {
 
   show(panoId: string, settings: PanoSettings = {}): void {
     this.clearListeners();
+    cancelAnimationFrame(this.turning); // a turn north from the last round
     if (this.current?.panoId !== panoId) this.rebuilds = 0; // a new round
     this.current = { panoId, settings };
     this.jumpingHome = false;
@@ -291,6 +295,7 @@ export class PanoView {
     this.resetView(pano);
     this.watchForBlackScreen(pano);
     this.trackTelemetry(pano, panoId, settings);
+    this.on(pano, 'pov_changed', () => this.onHeading?.(pano.getPov().heading));
 
     // No Pan blocks mouse and touch entirely; the pov guard catches the keyboard.
     if (this.lockEl) this.lockEl.hidden = !noPan;
@@ -398,6 +403,26 @@ export class PanoView {
     if (settings.noMove || this.pano.getPano() === panoId) return;
     this.jumpingHome = true;
     this.pano.setPano(panoId);
+  }
+
+  /** Turn the view to north, the short way round, keeping the pitch. */
+  faceNorth(): void {
+    const pano = this.pano;
+    if (!pano || this.current?.settings.noPan) return;
+    cancelAnimationFrame(this.turning);
+    const from = pano.getPov();
+    // -180..180, so the turn never goes the long way
+    const delta = ((((0 - from.heading) % 360) + 540) % 360) - 180;
+    if (Math.abs(delta) < 0.5) return;
+    const start = performance.now();
+    const ms = 250 + Math.abs(delta) * 2;
+    const step = (now: number): void => {
+      const p = Math.min(1, (now - start) / ms);
+      const eased = 1 - (1 - p) ** 3;
+      pano.setPov({ heading: from.heading + delta * eased, pitch: from.pitch });
+      if (p < 1) this.turning = requestAnimationFrame(step);
+    };
+    this.turning = requestAnimationFrame(step);
   }
 
   /** Throw the panorama away entirely and rebuild it from the last show(). */
