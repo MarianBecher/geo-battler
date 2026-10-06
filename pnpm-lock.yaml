@@ -70,8 +70,8 @@ importers:
         specifier: ^0.1.1
         version: 0.1.1
       pencil-faces:
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^1.0.0
+        version: 1.0.0
       tiny-orchestra:
         specifier: ^0.2.0
         version: 0.2.0
@@ -1147,8 +1147,8 @@ packages:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
 
-  pencil-faces@0.1.0:
-    resolution: {integrity: sha512-tjt+nKnP7HAxQsBA/aNCEzhxNcLLxkRHlZBACLjIkVaR/QluDd+hG0tQfH5Jl+afOcZVt9PRgUt6Cd80bo4W0A==}
+  pencil-faces@1.0.0:
+    resolution: {integrity: sha512-RuqIxDLI7X9yqOD2NM0TAxkL6FrHgraVEX2N3cIb1BCVvAM8kFTRdyAYBDzcMa9NiNCpUO85/yvI3GeXUZM/Zg==}
     engines: {node: '>=22'}
 
   picocolors@1.1.1:
@@ -2346,7 +2346,7 @@ snapshots:
 
   pathval@2.0.1: {}
 
-  pencil-faces@0.1.0: {}
+  pencil-faces@1.0.0: {}
 
   picocolors@1.1.1: {}
 
