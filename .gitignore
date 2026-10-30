@@ -3,6 +3,7 @@ dist/
 .env
 data/
 *.log
+*.tsbuildinfo
 
 # Local-only anthem arrangements that are not freely licensed.
 # They must never be committed, see apps/web/scripts/copy-assets.mjs.
