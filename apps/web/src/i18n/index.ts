@@ -68,7 +68,10 @@ function format(template: string, params: Params): string {
  * form from `params.n`.
  */
 export function t(key: MessageKey, params: Params = {}): string {
-  const entry = DICTS[current][key];
+  // A stale cached bundle can be handed keys newer than its dictionary (the
+  // server grew, the browser cache did not) - show the key, do not crash.
+  const entry = DICTS[current][key] as Message | undefined;
+  if (entry === undefined) return key;
   if (typeof entry === 'string') return format(entry, params);
   const n = Number(params.n);
   return format(n === 1 ? entry.one : entry.other, params);
