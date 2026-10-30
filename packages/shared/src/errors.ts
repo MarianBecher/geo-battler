@@ -11,7 +11,7 @@ export const ERROR_CODES = [
   'cannotKickSelf', 'playerAway',
   'noRoundRunning', 'afterCountdown', 'roundNotStarted', 'roundPaused', 'spectating',
   'chatClosed', 'chatTooFast',
-  'notVotable', 'hostLocked', 'unknownPack', 'noPanNeedsNoMove',
+  'notVotable', 'hostLocked', 'unknownRegion', 'unknownScenery', 'noPanNeedsNoMove',
   'wrongMoment', 'hostOnly', 'gameRunning', 'noPlayers', 'duelNeedsTwo', 'teamEmpty',
   'roundStillRunning', 'noLocationFound', 'noRoomCodes', 'noStreetView',
 ] as const;

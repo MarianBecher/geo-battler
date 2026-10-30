@@ -222,9 +222,10 @@ export class Hall {
     // A duel lasts as long as it lasts - its point total cannot be compared
     // with a game over a fixed number of rounds.
     const comparable = summary.mode !== 'duel';
-    // On a small map pack every guess is closer - records for rounds and
-    // guesses therefore only count on the whole world.
-    const worldwide = summary.settings.pack === 'world';
+    // On a small region, or with the scenery narrowed down, every guess is
+    // closer - records for rounds and guesses therefore only count on the
+    // whole world with anything goes.
+    const worldwide = summary.settings.region === 'world' && summary.settings.scenery === 'any';
 
     this.data.games++;
     this.data.rounds += summary.rounds;

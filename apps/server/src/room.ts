@@ -6,9 +6,9 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-  COUNTDOWN_MS, DEFAULT_PACK, DEFAULT_SETTINGS, LIMITS, PLAYER_COLORS, TEAM_IDS, TEAM_PALETTES, TEAMS, VOTE_FLAGS, VOTE_KEYS,
-  damageMultiplier, distanceKm, isPackId, isTeamId, scoreGuess,
-  type DrawResult, type EffectiveFlags, type GameMode, type LatLng, type LeaderboardEntry, type LoadError, type PackId, type PlayedRound,
+  COUNTDOWN_MS, DEFAULT_REGION, DEFAULT_SCENERY, DEFAULT_SETTINGS, LIMITS, PLAYER_COLORS, TEAM_IDS, TEAM_PALETTES, TEAMS, VOTE_FLAGS, VOTE_KEYS,
+  damageMultiplier, distanceKm, isRegionId, isSceneryId, isTeamId, scoreGuess,
+  type DrawResult, type EffectiveFlags, type GameMode, type LatLng, type LeaderboardEntry, type LoadError, type PlayedRound, type RegionId, type SceneryId,
   type RevealMessage, type RoomPhase, type RoomSnapshot, type RoundMessage, type RoundResult, type Settings, type SpectatorReason,
   type TeamId, type TeamRoundResult, type TeamStanding, type TeamState, type VoteFlag, type VoteKey, type VoteTally, type PinSnapshot, type ChatMessage,
   GAME_MODES,
@@ -89,11 +89,17 @@ export const googleFinder = (apiKey: string): LocationFinder => async (count, op
   return found;
 };
 
-type Ballot = Partial<Record<VoteFlag, boolean>> & { pack?: PackId };
+type Ballot = Partial<Record<VoteFlag, boolean>> & { region?: RegionId; scenery?: SceneryId };
 
-/** A ballot as a whole wish: what the player did not set is off, the pack the world. */
+/** A ballot as a whole wish: unset restrictions are off, the region the world, the scenery anything. */
 function wishOf(ballot: Ballot): EffectiveFlags {
-  return { noMove: !!ballot.noMove, noPan: !!ballot.noPan, noZoom: !!ballot.noZoom, pack: ballot.pack ?? DEFAULT_PACK };
+  return {
+    noMove: !!ballot.noMove,
+    noPan: !!ballot.noPan,
+    noZoom: !!ballot.noZoom,
+    region: ballot.region ?? DEFAULT_REGION,
+    scenery: ballot.scenery ?? DEFAULT_SCENERY,
+  };
 }
 
 export interface RoomOptions {
@@ -110,16 +116,42 @@ const finite = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/**
+ * Destination used to be one `pack` key; it is now the two axes region and
+ * scenery. A client from before the split (a cached bundle, a stored setting)
+ * still sends the old key, so translate it instead of dropping the wish.
+ */
+const LEGACY_PACKS: Record<string, { region?: RegionId; scenery?: SceneryId }> = {
+  world: { region: 'world', scenery: 'any' },
+  cities: { region: 'world', scenery: 'city' },
+  towns: { region: 'world', scenery: 'town' },
+  europe: { region: 'europe' },
+  dach: { region: 'dach' },
+  americas: { region: 'americas' },
+  asia: { region: 'asia' },
+  africa: { region: 'africa' },
+  oceania: { region: 'oceania' },
+};
+
+export function legacyPack(value: unknown): { region?: RegionId; scenery?: SceneryId } | null {
+  return typeof value === 'string' ? LEGACY_PACKS[value] ?? null : null;
+}
+
 export function sanitizeSettings(input: Partial<Settings> | undefined, base: Settings = DEFAULT_SETTINGS): Settings {
   const raw = input ?? {};
+  const legacy = legacyPack((raw as { pack?: unknown }).pack);
   const rounds = finite(raw.rounds) ?? base.rounds;
   const hp = finite(raw.hp) ?? base.hp;
   const rawLimit = finite(raw.timeLimit) ?? base.timeLimit;
 
   const flag = (name: VoteFlag): boolean => (raw[name] === undefined ? base[name] : !!raw[name]);
-  const locked = Object.fromEntries(VOTE_KEYS.map((name) => [
-    name, raw.locked?.[name] === undefined ? base.locked[name] : !!raw.locked[name],
-  ])) as Record<VoteKey, boolean>;
+  const legacyLock = (raw.locked as Record<string, unknown> | undefined)?.pack;
+  const locked = Object.fromEntries(VOTE_KEYS.map((name) => {
+    const own = raw.locked?.[name];
+    // An old client locks both axes at once - it only knew the one key.
+    if (own === undefined && legacyLock !== undefined && (name === 'region' || name === 'scenery')) return [name, !!legacyLock];
+    return [name, own === undefined ? base.locked[name] : !!own];
+  })) as Record<VoteKey, boolean>;
   // No Pan without No Move makes no sense: whoever may walk turns with it.
   const noPan = flag('noPan');
   const noMove = flag('noMove') || noPan;
@@ -133,7 +165,8 @@ export function sanitizeSettings(input: Partial<Settings> | undefined, base: Set
     noMove,
     noPan,
     noZoom: flag('noZoom'),
-    pack: isPackId(raw.pack) ? raw.pack : base.pack,
+    region: isRegionId(raw.region) ? raw.region : legacy?.region ?? base.region,
+    scenery: isSceneryId(raw.scenery) ? raw.scenery : legacy?.scenery ?? base.scenery,
     locked,
   };
 }
@@ -484,13 +517,13 @@ export class Room {
     return message;
   }
 
-  // --- Wishes for No Move / No Pan / No Zoom and the map pack ------------
+  // --- Wishes for No Move / No Pan / No Zoom, the region and the scenery ---
   //
   // Everyone who sets anything has a whole wish (see wishOf). At the start
   // one wish is drawn at random and applies as it is, so a minority gets its
   // turn too. Whatever the host locks applies on every wish.
 
-  vote(playerId: string, flag: VoteKey, value: boolean | PackId | null): void {
+  vote(playerId: string, flag: VoteKey, value: boolean | string | null): void {
     if (!this.inLobby()) fail('lobbyOnlyVote');
     if (!VOTE_KEYS.includes(flag)) fail('notVotable');
     if (!this.players.has(playerId)) fail('unknownPlayer');
@@ -498,10 +531,17 @@ export class Room {
     if (locked[flag]) fail('hostLocked');
 
     const ballot: Ballot = { ...(this.votes.get(playerId) ?? {}) };
-    if (flag === 'pack') {
-      if (value !== null && !isPackId(value)) fail('unknownPack');
-      if (value === null) delete ballot.pack;
-      else ballot.pack = value;
+    if (flag === 'region') {
+      if (value !== null && !isRegionId(value)) fail('unknownRegion');
+      if (value === null) delete ballot.region;
+      else ballot.region = value;
+      this.storeBallot(playerId, ballot);
+      return;
+    }
+    if (flag === 'scenery') {
+      if (value !== null && !isSceneryId(value)) fail('unknownScenery');
+      if (value === null) delete ballot.scenery;
+      else ballot.scenery = value;
       this.storeBallot(playerId, ballot);
       return;
     }
@@ -535,12 +575,15 @@ export class Room {
       .filter((w): w is { player: Player; wish: EffectiveFlags } => !!w.player?.connected);
   }
 
-  /** Who wants what, per restriction and per pack. */
+  /** Who wants what, per restriction, per region and per scenery. */
   voteTally(): VoteTally {
-    const tally: VoteTally = { noMove: { yes: [], no: [] }, noPan: { yes: [], no: [] }, noZoom: { yes: [], no: [] }, pack: {} };
+    const tally: VoteTally = {
+      noMove: { yes: [], no: [] }, noPan: { yes: [], no: [] }, noZoom: { yes: [], no: [] }, region: {}, scenery: {},
+    };
     for (const { player, wish } of this.wishes()) {
       for (const flag of VOTE_FLAGS) tally[flag][wish[flag] ? 'yes' : 'no'].push(player.id);
-      (tally.pack[wish.pack] ??= []).push(player.id);
+      (tally.region[wish.region] ??= []).push(player.id);
+      (tally.scenery[wish.scenery] ??= []).push(player.id);
     }
     return tally;
   }
@@ -566,7 +609,7 @@ export class Room {
   drawWish(): { flags: EffectiveFlags; draw: DrawResult | null } {
     const wishes = this.wishes();
     const locked = VOTE_KEYS.filter((key) => this.settings.locked[key]);
-    const fallback = this.withLocks({ noMove: false, noPan: false, noZoom: false, pack: DEFAULT_PACK });
+    const fallback = this.withLocks({ noMove: false, noPan: false, noZoom: false, region: DEFAULT_REGION, scenery: DEFAULT_SCENERY });
     if (!wishes.length || locked.length === VOTE_KEYS.length) return { flags: fallback, draw: null };
 
     const index = Math.min(wishes.length - 1, Math.floor(this.random() * wishes.length));
@@ -574,7 +617,7 @@ export class Room {
     const flags = this.withLocks(wish);
     const same = (other: EffectiveFlags): boolean => {
       const o = this.withLocks(other);
-      return o.pack === flags.pack && VOTE_FLAGS.every((f) => o[f] === flags[f]);
+      return o.region === flags.region && o.scenery === flags.scenery && VOTE_FLAGS.every((f) => o[f] === flags[f]);
     };
     return {
       flags,
@@ -690,7 +733,7 @@ export class Room {
   }
 
   private findLocations(count: number): Promise<Located[]> {
-    return this.finder(count, { requireMove: !this.settings.noMove, pack: this.settings.pack });
+    return this.finder(count, { requireMove: !this.settings.noMove, region: this.settings.region, scenery: this.settings.scenery });
   }
 
   /** Read fresh after an await: the game may have been cancelled or restarted meanwhile. */

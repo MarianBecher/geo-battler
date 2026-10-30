@@ -3,17 +3,23 @@
 export const GAME_MODES = ['classic', 'duel'] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 
-/** Map packs: which region boxes the location search rolls in (see the server's locations module). */
-export const PACK_IDS = ['world', 'europe', 'dach', 'americas', 'asia', 'africa', 'oceania'] as const;
-export type PackId = (typeof PACK_IDS)[number];
-export const DEFAULT_PACK: PackId = 'world';
-export const isPackId = (value: unknown): value is PackId => PACK_IDS.includes(value as PackId);
+/** Regions: where in the world the location search rolls (see the server's locations module). */
+export const REGION_IDS = ['world', 'europe', 'dach', 'americas', 'asia', 'africa', 'oceania'] as const;
+export type RegionId = (typeof REGION_IDS)[number];
+export const DEFAULT_REGION: RegionId = 'world';
+export const isRegionId = (value: unknown): value is RegionId => REGION_IDS.includes(value as RegionId);
+
+/** Scenery: how built-up the find must be. Combines freely with the region. */
+export const SCENERY_IDS = ['any', 'city', 'town', 'rural'] as const;
+export type SceneryId = (typeof SCENERY_IDS)[number];
+export const DEFAULT_SCENERY: SceneryId = 'any';
+export const isSceneryId = (value: unknown): value is SceneryId => SCENERY_IDS.includes(value as SceneryId);
 
 /** The restrictions everyone sets a wish for. */
 export const VOTE_FLAGS = ['noMove', 'noPan', 'noZoom'] as const;
 export type VoteFlag = (typeof VOTE_FLAGS)[number];
-/** Everything in a wish: the restrictions on or off, the pack by choice. */
-export const VOTE_KEYS = [...VOTE_FLAGS, 'pack'] as const;
+/** Everything in a wish: the restrictions on or off, region and scenery by choice. */
+export const VOTE_KEYS = [...VOTE_FLAGS, 'region', 'scenery'] as const;
 export type VoteKey = (typeof VOTE_KEYS)[number];
 
 export interface Settings {
@@ -29,7 +35,8 @@ export interface Settings {
   noMove: boolean;
   noPan: boolean;
   noZoom: boolean;
-  pack: PackId;
+  region: RegionId;
+  scenery: SceneryId;
   /** Which of the wish keys the host locked - the draw decides the rest. */
   locked: Record<VoteKey, boolean>;
 }
@@ -52,8 +59,9 @@ export const DEFAULT_SETTINGS: Settings = {
   noMove: false,
   noPan: false,
   noZoom: false,
-  pack: DEFAULT_PACK,
-  locked: { noMove: false, noPan: false, noZoom: false, pack: false },
+  region: DEFAULT_REGION,
+  scenery: DEFAULT_SCENERY,
+  locked: { noMove: false, noPan: false, noZoom: false, region: false, scenery: false },
 };
 
 /** Team duel: two teams with a shared HP bar. Names are translated on the client. */

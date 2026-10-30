@@ -6,7 +6,7 @@
 import { VOTE_FLAGS, type DrawResult, type RoomSnapshot } from '@geo-battler/shared';
 import { $, escapeHtml, motionAllowed, replay } from '../dom.ts';
 import { fmtNum, t } from '../i18n/index.ts';
-import { flagName, packName } from '../format.ts';
+import { flagName, regionName, sceneryName } from '../format.ts';
 import { photo } from '../photo.ts';
 import { isMe } from '../state.ts';
 import * as sfx from '../audio/sound.ts';
@@ -47,7 +47,8 @@ function alikeLine(draw: DrawResult, room: RoomSnapshot): string {
 
 function stamps(draw: DrawResult): string {
   const rows: { label: string; value: string; on: boolean; locked: boolean }[] = [
-    { label: t('lobby.destination'), value: packName(draw.flags.pack), on: true, locked: draw.locked.includes('pack') },
+    { label: t('lobby.destination'), value: regionName(draw.flags.region), on: true, locked: draw.locked.includes('region') },
+    { label: t('lobby.scenery'), value: sceneryName(draw.flags.scenery), on: true, locked: draw.locked.includes('scenery') },
     ...VOTE_FLAGS.map((flag) => ({
       label: flagName(flag),
       value: draw.flags[flag] ? t('vote.on') : t('vote.off'),

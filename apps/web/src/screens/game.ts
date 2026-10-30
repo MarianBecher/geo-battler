@@ -5,7 +5,7 @@ import type { RoomSnapshot, RoundMessage, PinSnapshot } from '@geo-battler/share
 import * as sfx from '../audio/sound.ts';
 import { $, escapeHtml, replay, storage } from '../dom.ts';
 import { fmtNum, t } from '../i18n/index.ts';
-import { multiplierText, packName, teamName } from '../format.ts';
+import { multiplierText, regionName, sceneryName, teamName } from '../format.ts';
 import { GuessMap, PanoView } from '../maps/google.ts';
 import { photo } from '../photo.ts';
 import { amOut, isDuel, isHost, isMe, isTeamDuel, serverNow, state } from '../state.ts';
@@ -132,7 +132,8 @@ export function startRound(msg: RoundMessage, show: () => void): void {
   $('btn-pano-home').hidden = msg.settings.noMove;
   $<HTMLButtonElement>('btn-compass').disabled = msg.settings.noPan;
   $('hud-modes').innerHTML = [
-    msg.settings.pack !== 'world' && escapeHtml(packName(msg.settings.pack)),
+    msg.settings.region !== 'world' && escapeHtml(regionName(msg.settings.region)),
+    msg.settings.scenery !== 'any' && escapeHtml(sceneryName(msg.settings.scenery)),
     msg.settings.noMove && 'NM',
     msg.settings.noPan && 'NP',
     msg.settings.noZoom && 'NZ',

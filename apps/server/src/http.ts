@@ -7,7 +7,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_SETTINGS, PACK_IDS, PLAYER_COLORS, TEAM_PALETTES, TEAMS, type ClientConfig, type HttpError } from '@geo-battler/shared';
+import { DEFAULT_SETTINGS, PLAYER_COLORS, REGION_IDS, SCENERY_IDS, TEAM_PALETTES, TEAMS, type ClientConfig, type HttpError } from '@geo-battler/shared';
 import { env, missingKeys } from './env.ts';
 import { GameError } from './errors.ts';
 import type { Hall } from './hall.ts';
@@ -46,7 +46,8 @@ export function createApp(hall: Hall): Hono {
       colors: PLAYER_COLORS,
       teams: TEAMS,
       teamPalettes: TEAM_PALETTES,
-      packs: [...PACK_IDS],
+      regions: [...REGION_IDS],
+      sceneries: [...SCENERY_IDS],
       configured: missingKeys().length === 0,
       missing: missingKeys(),
       defaults: DEFAULT_SETTINGS,

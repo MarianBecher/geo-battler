@@ -209,8 +209,8 @@ function createHandlers(manager: RoomManager, hall: Hall): Handlers {
     async ready(conn, msg) { await conn.requireRoom().setReady(conn.requireId(), !!msg.value); },
 
     vote(conn, msg) {
-      // Restrictions: yes/no; pack: the pack id - anything else withdraws the vote.
-      const value = msg.flag === 'pack'
+      // Restrictions: yes/no; region and scenery: their id - anything else withdraws the vote.
+      const value = msg.flag === 'region' || msg.flag === 'scenery'
         ? (typeof msg.value === 'string' ? msg.value : null)
         : (msg.value === true || msg.value === false ? msg.value : null);
       conn.requireRoom().vote(conn.requireId(), msg.flag, value);

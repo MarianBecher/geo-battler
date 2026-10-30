@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COUNTDOWN_MS, DEFAULT_SETTINGS, type ErrorCode } from '@geo-battler/shared';
+import { COUNTDOWN_MS, DEFAULT_SETTINGS, type ErrorCode, type Settings } from '@geo-battler/shared';
 import { Room, sanitizeFace, sanitizeName, sanitizeSettings, type LocationFinder, type RoomOptions } from '../src/room.ts';
 import { GameError } from '../src/errors.ts';
 
@@ -51,11 +51,28 @@ describe('sanitizeSettings', () => {
     expect(s.noPan).toBe(true);
   });
   it('keeps the base for anything unknown', () => {
-    const base = { ...DEFAULT_SETTINGS, rounds: 7, pack: 'asia' as const };
-    const s = sanitizeSettings({ mode: 'hexagon' as never, pack: 'mars' as never }, base);
+    const base = { ...DEFAULT_SETTINGS, rounds: 7, region: 'asia' as const };
+    const s = sanitizeSettings({ mode: 'hexagon' as never, region: 'mars' as never }, base);
     expect(s.mode).toBe('classic');
     expect(s.rounds).toBe(7);
-    expect(s.pack).toBe('asia');
+    expect(s.region).toBe('asia');
+  });
+
+  it('translates the old single pack key into the two axes', () => {
+    // A cached bundle from before the split still sends `pack`.
+    const old = (pack: string): Settings => sanitizeSettings({ pack } as never);
+    expect(old('world')).toMatchObject({ region: 'world', scenery: 'any' });
+    expect(old('cities')).toMatchObject({ region: 'world', scenery: 'city' });
+    expect(old('towns')).toMatchObject({ region: 'world', scenery: 'town' });
+    expect(old('dach')).toMatchObject({ region: 'dach', scenery: 'any' });
+    // Nonsense falls back to the defaults, as any unknown value does.
+    expect(old('mars')).toMatchObject({ region: 'world', scenery: 'any' });
+  });
+
+  it('locks both axes when an old client locks its one pack key', () => {
+    const s = sanitizeSettings({ pack: 'europe', locked: { pack: true } } as never);
+    expect(s.locked).toMatchObject({ region: true, scenery: true });
+    expect(s.region).toBe('europe');
   });
 });
 
@@ -102,21 +119,32 @@ describe('lobby', () => {
 });
 
 describe('wishes', () => {
-  it('turns every ballot into a whole wish: unset is off, the pack the world', () => {
+  it('turns every ballot into a whole wish: unset is off, the region the world, the scenery anything', () => {
     const { room, ada, bob } = lobby();
     room.vote(ada.id, 'noZoom', true);
-    room.vote(bob.id, 'pack', 'asia');
+    room.vote(bob.id, 'region', 'asia');
     const tally = room.voteTally();
     expect(tally.noZoom).toEqual({ yes: [ada.id], no: [bob.id] });
     expect(tally.noMove).toEqual({ yes: [], no: [ada.id, bob.id] });
-    expect(tally.pack).toEqual({ world: [ada.id], asia: [bob.id] });
+    expect(tally.region).toEqual({ world: [ada.id], asia: [bob.id] });
+    expect(tally.scenery).toEqual({ any: [ada.id, bob.id] });
+  });
+
+  it('keeps region and scenery apart, so they combine freely', () => {
+    const { room, ada, bob } = lobby();
+    room.vote(ada.id, 'region', 'dach');
+    room.vote(ada.id, 'scenery', 'city');
+    room.vote(bob.id, 'scenery', 'city');
+    const tally = room.voteTally();
+    expect(tally.region).toEqual({ dach: [ada.id], world: [bob.id] });
+    expect(tally.scenery).toEqual({ city: [ada.id, bob.id] });
   });
 
   it('counts nobody who set nothing, or took everything back', () => {
     const { room, ada } = lobby();
     room.vote(ada.id, 'noZoom', true);
     room.vote(ada.id, 'noZoom', null);
-    expect(room.voteTally().pack).toEqual({});
+    expect(room.voteTally().region).toEqual({});
   });
 
   it('pulls No Move along with a wish for No Pan', () => {
@@ -129,8 +157,10 @@ describe('wishes', () => {
 
   it('refuses wishes on what the host locked', () => {
     const { room, ada, bob } = lobby();
-    room.updateSettings(ada.id, { pack: 'europe', locked: { ...DEFAULT_SETTINGS.locked, pack: true } });
-    expect(() => room.vote(bob.id, 'pack', 'asia')).toThrowError(failsWith('hostLocked'));
+    room.updateSettings(ada.id, { region: 'europe', locked: { ...DEFAULT_SETTINGS.locked, region: true } });
+    expect(() => room.vote(bob.id, 'region', 'asia')).toThrowError(failsWith('hostLocked'));
+    // The other axis stays open - each one locks on its own.
+    expect(() => room.vote(bob.id, 'scenery', 'town')).not.toThrow();
   });
 
   it('drops the wish of whoever leaves the lobby', () => {
@@ -148,23 +178,24 @@ describe('the draw', () => {
   it('applies the drawn wish as it is, even against the majority', async () => {
     const { room, ada, bob } = lobby(fixedFinder(), { random: () => 0.99 });
     const cy = room.addPlayer('Cy', socket());
-    room.vote(ada.id, 'pack', 'europe');
-    room.vote(bob.id, 'pack', 'europe');
-    room.vote(cy.id, 'pack', 'africa');
+    room.vote(ada.id, 'region', 'europe');
+    room.vote(bob.id, 'region', 'europe');
+    room.vote(cy.id, 'region', 'africa');
+    room.vote(cy.id, 'scenery', 'town');
     room.vote(cy.id, 'noPan', true);
     await startGame(room);
-    expect(room.settings).toMatchObject({ pack: 'africa', noMove: true, noPan: true, noZoom: false });
+    expect(room.settings).toMatchObject({ region: 'africa', scenery: 'town', noMove: true, noPan: true, noZoom: false });
     expect(room.snapshot().draw).toMatchObject({ playerId: cy.id, name: 'Cy', alike: [], wishes: 3 });
   });
 
   it('lays the locks over the drawn wish and finds the alike ones after them', async () => {
     const { room, ada, bob } = lobby(fixedFinder(), { random: () => 0 });
-    room.vote(ada.id, 'pack', 'asia');
-    room.vote(bob.id, 'pack', 'africa');
-    room.updateSettings(ada.id, { pack: 'dach', locked: { ...DEFAULT_SETTINGS.locked, pack: true } });
+    room.vote(ada.id, 'region', 'asia');
+    room.vote(bob.id, 'region', 'africa');
+    room.updateSettings(ada.id, { region: 'dach', locked: { ...DEFAULT_SETTINGS.locked, region: true } });
     await startGame(room);
-    expect(room.settings.pack).toBe('dach');
-    expect(room.snapshot().draw).toMatchObject({ playerId: ada.id, alike: [bob.id], locked: ['pack'] });
+    expect(room.settings.region).toBe('dach');
+    expect(room.snapshot().draw).toMatchObject({ playerId: ada.id, alike: [bob.id], locked: ['region'] });
   });
 
   it('draws nothing without wishes and falls back to the defaults', async () => {
@@ -172,7 +203,7 @@ describe('the draw', () => {
     room.updateSettings(ada.id, { noZoom: true });
     await startGame(room);
     expect(room.snapshot().draw).toBeNull();
-    expect(room.settings).toMatchObject({ pack: 'world', noMove: false, noZoom: false });
+    expect(room.settings).toMatchObject({ region: 'world', scenery: 'any', noMove: false, noZoom: false });
   });
 
   it('holds the first round until everyone has seen the drawn wish', async () => {

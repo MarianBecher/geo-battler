@@ -4,7 +4,7 @@
 
 import type { ErrorCode, ErrorParams, GameErrorPayload } from './errors.ts';
 import type { LatLng } from './scoring.ts';
-import type { GameMode, PackId, Settings, TeamId, VoteFlag, VoteKey } from './settings.ts';
+import type { GameMode, RegionId, SceneryId, Settings, TeamId, VoteFlag, VoteKey } from './settings.ts';
 import type { AwardedTitle, MetricRow } from './titles.ts';
 import type { ContinentCode } from './continents.ts';
 
@@ -37,7 +37,8 @@ export type ClientMessage =
   | { t: 'telemetry'; stats: Partial<Telemetry> }
   | { t: 'ready'; value: boolean }
   | { t: 'vote'; flag: VoteFlag; value: boolean | null }
-  | { t: 'vote'; flag: 'pack'; value: PackId | null }
+  | { t: 'vote'; flag: 'region'; value: RegionId | null }
+  | { t: 'vote'; flag: 'scenery'; value: SceneryId | null }
   | { t: 'team'; team: TeamId }
   | { t: 'color'; color: string }
   | { t: 'face'; face: number }
@@ -74,19 +75,22 @@ export interface PlayerSnapshot {
 
 /**
  * Every player who set anything has a whole wish: what they did not set counts
- * as off, the pack as the world. `no` therefore lists everyone with a wish who
- * does not want the restriction, and every wisher appears under one pack.
+ * as off, the region as the world and the scenery as anything. `no` therefore
+ * lists everyone with a wish who does not want the restriction, and every
+ * wisher appears under exactly one region and one scenery.
  */
 export interface VoteTally {
   noMove: { yes: string[]; no: string[] };
   noPan: { yes: string[]; no: string[] };
   noZoom: { yes: string[]; no: string[] };
-  /** packId -> voters */
-  pack: Partial<Record<PackId, string[]>>;
+  /** regionId -> voters */
+  region: Partial<Record<RegionId, string[]>>;
+  /** sceneryId -> voters */
+  scenery: Partial<Record<SceneryId, string[]>>;
 }
 
-/** The restrictions and the pack as they apply to a game. */
-export type EffectiveFlags = Record<VoteFlag, boolean> & { pack: PackId };
+/** The restrictions, the region and the scenery as they apply to a game. */
+export type EffectiveFlags = Record<VoteFlag, boolean> & { region: RegionId; scenery: SceneryId };
 
 /** The wish drawn at the start of a game - shown while the places load. */
 export interface DrawResult {
@@ -301,7 +305,8 @@ export interface ClientConfig {
   colors: readonly string[];
   teams: readonly { id: TeamId; color: string }[];
   teamPalettes: Record<TeamId, readonly string[]>;
-  packs: PackId[];
+  regions: RegionId[];
+  sceneries: SceneryId[];
   configured: boolean;
   missing: string[];
   defaults: Settings;

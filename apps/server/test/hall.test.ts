@@ -49,10 +49,10 @@ describe('Hall', () => {
     expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 1, live: true });
   });
 
-  it('counts wins in a row on every pack, breaks the streak on a loss and ignores solo games', async () => {
+  it('counts wins in a row on every destination, breaks the streak on a loss and ignores solo games', async () => {
     const later = (h: number, over: Partial<GameSummary> = {}) => summary({ at: Date.parse('2026-09-26T18:00:00Z') + h * 3600_000, ...over });
     await hall.record(later(0));
-    await hall.record(later(1, { settings: { ...DEFAULT_SETTINGS, pack: 'dach' } }));
+    await hall.record(later(1, { settings: { ...DEFAULT_SETTINGS, region: 'dach' } }));
     await hall.record(later(2, { mode: 'duel' }));
     // Alone at the table: neither a win nor a loss.
     await hall.record(later(3, { players: [summary().players[1]!], winners: ['Bob'] }));
@@ -96,14 +96,21 @@ describe('Hall', () => {
     expect(records.bestGuess).toMatchObject({ name: 'Ada' });
   });
 
-  it('keeps small map packs out of the guess and game records and the average', async () => {
-    await hall.record(summary({ settings: { ...DEFAULT_SETTINGS, pack: 'europe' } }));
+  it('keeps a narrowed destination out of the guess and game records and the average', async () => {
+    await hall.record(summary({ settings: { ...DEFAULT_SETTINGS, region: 'europe' } }));
     const view = await hall.view();
     expect(view.records.bestGuess).toBeUndefined();
     expect(view.records.bestGame).toBeUndefined();
     expect(view.records.bestStreak).toMatchObject({ name: 'Ada', wins: 1 });
     expect(view.players[0]!.avgPoints).toBe(0);
     expect(view.players[0]!.games).toBe(1);
+  });
+
+  it('keeps a narrowed scenery out too, even on the whole world', async () => {
+    await hall.record(summary({ settings: { ...DEFAULT_SETTINGS, region: 'world', scenery: 'city' } }));
+    const view = await hall.view();
+    expect(view.records.bestGuess).toBeUndefined();
+    expect(view.players[0]!.avgPoints).toBe(0);
   });
 
   it('recognises players by name regardless of case and spacing', async () => {

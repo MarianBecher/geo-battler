@@ -29,7 +29,7 @@ const ctxFor = (entries: PlayerEntry[], actuals: { lat: number; lng: number }[])
     const best = Math.max(...entries.map((e) => e.rounds[i]!.points));
     roundWinners.set(i + 1, new Set(entries.filter((e) => e.rounds[i]!.points === best).map((e) => e.playerId)));
   });
-  return { roundWinners, actuals: new Map(actuals.map((a, i) => [i + 1, a])), actualSpreadKm: 9000, settings: { mode: 'classic' as const, rounds: actuals.length, hp: 6000, teams: false, timeLimit: 90, noMove: false, noPan: false, noZoom: false, pack: 'world' as const, locked: { noMove: false, noPan: false, noZoom: false, pack: false } }, timeLimitMs: 90000, duel: null };
+  return { roundWinners, actuals: new Map(actuals.map((a, i) => [i + 1, a])), actualSpreadKm: 9000, settings: { mode: 'classic' as const, rounds: actuals.length, hp: 6000, teams: false, timeLimit: 90, noMove: false, noPan: false, noZoom: false, region: 'world' as const, scenery: 'any' as const, locked: { noMove: false, noPan: false, noZoom: false, region: false, scenery: false } }, timeLimitMs: 90000, duel: null };
 };
 
 describe('buildFinalStats', () => {

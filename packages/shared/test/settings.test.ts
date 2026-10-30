@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { damageMultiplier, isPackId, PACK_IDS, TEAM_PALETTES, TEAMS } from '../src/settings.ts';
+import { damageMultiplier, isRegionId, isSceneryId, REGION_IDS, SCENERY_IDS, TEAM_PALETTES, TEAMS } from '../src/settings.ts';
 
 describe('damageMultiplier', () => {
   it('is x1 for the first five rounds and grows by 0.5 from round six', () => {
@@ -7,10 +7,17 @@ describe('damageMultiplier', () => {
   });
 });
 
-describe('packs and teams', () => {
-  it('recognises pack ids', () => {
-    for (const id of PACK_IDS) expect(isPackId(id)).toBe(true);
-    expect(isPackId('mars')).toBe(false);
+describe('destination and teams', () => {
+  it('recognises region ids', () => {
+    for (const id of REGION_IDS) expect(isRegionId(id)).toBe(true);
+    expect(isRegionId('mars')).toBe(false);
+    // The axes are separate lists - a scenery is no region.
+    expect(isRegionId('city')).toBe(false);
+  });
+  it('recognises scenery ids', () => {
+    for (const id of SCENERY_IDS) expect(isSceneryId(id)).toBe(true);
+    expect(isSceneryId('moon')).toBe(false);
+    expect(isSceneryId('world')).toBe(false);
   });
   it('starts every team palette with the team colour', () => {
     for (const team of TEAMS) expect(TEAM_PALETTES[team.id][0]).toBe(team.color);

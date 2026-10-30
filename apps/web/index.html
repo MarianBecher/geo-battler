@@ -220,18 +220,29 @@
           </span>
         </label>
 
-        <!-- Everyone sets a wish for the three restrictions and the pack, at
-             the start one wish is drawn. The host can lock them. The rows are
-             filled by the lobby screen. -->
+        <!-- Everyone sets a wish for the three restrictions, the region and
+             the scenery; at the start one wish is drawn. The host can lock
+             each of them. The rows are filled by the lobby screen. -->
         <div class="toggles">
-          <!-- The map pack: everyone picks one as part of their wish. -->
-          <div class="vote-card pack-card" data-vote-box="pack">
+          <!-- Region and scenery are independent: "big city in DACH" is a
+               combination like any other. Everyone picks one of each. -->
+          <div class="vote-card pack-card" data-vote-box="region">
             <div class="vote-head">
               <div class="vote-text">
-                <strong data-i18n="lobby.destination">Destination</strong>
-                <em id="pack-hint" data-i18n="lobby.destinationHint">Where the places are</em>
+                <strong data-i18n="lobby.destination">Region</strong>
+                <em id="region-hint" data-i18n="lobby.destinationHint">Where in the world the places are</em>
               </div>
-              <span class="vote-result" data-i18n="pack.world.name">World</span>
+              <span class="vote-result" data-i18n="region.world.name">World</span>
+            </div>
+            <div class="vote-body"></div>
+          </div>
+          <div class="vote-card pack-card" data-vote-box="scenery">
+            <div class="vote-head">
+              <div class="vote-text">
+                <strong data-i18n="lobby.scenery">Scenery</strong>
+                <em id="scenery-hint" data-i18n="lobby.sceneryHint">How built-up the place has to be</em>
+              </div>
+              <span class="vote-result" data-i18n="scenery.any.name">Anything</span>
             </div>
             <div class="vote-body"></div>
           </div>

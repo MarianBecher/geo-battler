@@ -4,12 +4,12 @@
 // wish is drawn (see the draw screen).
 
 import {
-  DEFAULT_PACK, DEFAULT_SETTINGS, LIMITS, TEAMS, VOTE_FLAGS, isPackId,
-  type EffectiveFlags, type PackId, type PlayerSnapshot, type RoomSnapshot, type Settings, type TeamId, type VoteFlag, type VoteKey, type VoteTally,
+  DEFAULT_REGION, DEFAULT_SCENERY, DEFAULT_SETTINGS, LIMITS, TEAMS, VOTE_FLAGS, isRegionId, isSceneryId,
+  type EffectiveFlags, type PlayerSnapshot, type RegionId, type RoomSnapshot, type SceneryId, type Settings, type TeamId, type VoteFlag, type VoteKey, type VoteTally,
 } from '@geo-battler/shared';
 import { $, escapeHtml, inkOn, toast } from '../dom.ts';
 import { fmtNum, t } from '../i18n/index.ts';
-import { errorText, flagName, fmtTime, mrzPad, mrzText, packHint, packName, teamName } from '../format.ts';
+import { errorText, flagName, fmtTime, mrzPad, mrzText, regionHint, regionName, sceneryHint, sceneryName, teamName } from '../format.ts';
 import { photo, randomFace, rememberFace } from '../photo.ts';
 import { isHost, isMe, isTeamDuel, me, state } from '../state.ts';
 import { send } from '../socket.ts';
@@ -37,7 +37,8 @@ export function collectSettings(): Settings {
     noMove: base.noMove,
     noPan: base.noPan,
     noZoom: base.noZoom,
-    pack: base.pack,
+    region: base.region,
+    scenery: base.scenery,
     locked: { ...DEFAULT_SETTINGS.locked, ...base.locked },
     teams: $<HTMLInputElement>('setting-teams').querySelector<HTMLInputElement>('input')?.checked ?? false,
   };
@@ -73,14 +74,61 @@ function pushSettings(patch: Partial<Settings>): void {
   send({ t: 'settings', settings: next });
 }
 
-/** Host: lock a restriction (on/off) or release it to the vote again. For the pack, `value` is the pack id. */
-function lockFlag(flag: VoteKey, value: boolean | PackId | null): void {
+/**
+ * The destination is two independent axes, and both wear the same card: a row
+ * of chips, a share per chip, lockable on its own. Only the list and the names
+ * differ, so everything below takes the axis as a parameter.
+ */
+type ChoiceId = RegionId | SceneryId;
+
+interface Axis {
+  key: 'region' | 'scenery';
+  /** The ids the server offers, in the order it sends them. */
+  ids: () => readonly ChoiceId[];
+  name: (id: ChoiceId) => string;
+  hint: (id: ChoiceId) => string;
+  /** Element id of the subtitle that follows the hovered choice. */
+  hintEl: string;
+  fallback: ChoiceId;
+  isId: (value: unknown) => value is ChoiceId;
+  label: () => string;
+}
+
+const AXES: readonly Axis[] = [
+  {
+    key: 'region',
+    ids: () => state.config?.regions ?? [],
+    name: (id) => regionName(id as RegionId),
+    hint: (id) => regionHint(id as RegionId),
+    hintEl: 'region-hint',
+    fallback: DEFAULT_REGION,
+    isId: isRegionId,
+    label: () => t('lobby.destination'),
+  },
+  {
+    key: 'scenery',
+    ids: () => state.config?.sceneries ?? [],
+    name: (id) => sceneryName(id as SceneryId),
+    hint: (id) => sceneryHint(id as SceneryId),
+    hintEl: 'scenery-hint',
+    fallback: DEFAULT_SCENERY,
+    isId: isSceneryId,
+    label: () => t('lobby.scenery'),
+  },
+];
+
+const axisOf = (key: string): Axis | undefined => AXES.find((a) => a.key === key);
+const isVoteFlag = (key: VoteKey): key is VoteFlag => (VOTE_FLAGS as readonly string[]).includes(key);
+
+/** Host: lock a restriction (on/off) or release it to the vote again. For an axis, `value` is its id. */
+function lockFlag(flag: VoteKey, value: boolean | ChoiceId | null): void {
   const current = collectSettings();
   const patch: Partial<Settings> = { locked: { ...current.locked, [flag]: value !== null } };
   if (value !== null) {
-    if (flag === 'pack') {
-      if (isPackId(value)) patch.pack = value;
-    } else if (typeof value === 'boolean') {
+    const axis = axisOf(flag);
+    if (axis) {
+      if (axis.isId(value)) Object.assign(patch, { [axis.key]: value });
+    } else if (typeof value === 'boolean' && isVoteFlag(flag)) {
       patch[flag] = value;
       // No Pan without No Move makes no sense - pull both ways.
       if (flag === 'noPan' && value) patch.noMove = true;
@@ -101,13 +149,27 @@ function paintVoteBody(box: HTMLElement, body: string): void {
 
 const voteBox = (key: VoteKey): HTMLElement => document.querySelector<HTMLElement>(`[data-vote-box="${key}"]`)!;
 
-/** Every player's whole wish, rebuilt from the tally. */
+/** Every player's whole wish, rebuilt from the tally. Everyone with a wish appears under exactly one id per axis. */
 function wishesOf(votes: VoteTally): Map<string, EffectiveFlags> {
   const out = new Map<string, EffectiveFlags>();
-  for (const [pack, ids] of Object.entries(votes.pack) as [PackId, string[]][]) {
-    for (const id of ids) {
-      out.set(id, { pack, noMove: votes.noMove.yes.includes(id), noPan: votes.noPan.yes.includes(id), noZoom: votes.noZoom.yes.includes(id) });
-    }
+  const wish = (id: string): EffectiveFlags => {
+    const found = out.get(id);
+    if (found) return found;
+    const fresh: EffectiveFlags = {
+      region: DEFAULT_REGION,
+      scenery: DEFAULT_SCENERY,
+      noMove: votes.noMove.yes.includes(id),
+      noPan: votes.noPan.yes.includes(id),
+      noZoom: votes.noZoom.yes.includes(id),
+    };
+    out.set(id, fresh);
+    return fresh;
+  };
+  for (const [region, ids] of Object.entries(votes.region) as [RegionId, string[]][]) {
+    for (const id of ids) wish(id).region = region;
+  }
+  for (const [scenery, ids] of Object.entries(votes.scenery) as [SceneryId, string[]][]) {
+    for (const id of ids) wish(id).scenery = scenery;
   }
   return out;
 }
@@ -116,7 +178,7 @@ const percent = (part: number, whole: number): string => `${fmtNum(whole ? Math.
 
 /** The share of wishes that come out the same as mine - the host's locks apply to all of them alike. */
 function myChance(room: RoomSnapshot, wishes: Map<string, EffectiveFlags>, mine: EffectiveFlags): string {
-  const open = (['pack', ...VOTE_FLAGS] as VoteKey[]).filter((key) => !room.settings.locked[key]);
+  const open = (['region', 'scenery', ...VOTE_FLAGS] as VoteKey[]).filter((key) => !room.settings.locked[key]);
   const same = [...wishes.values()].filter((w) => open.every((key) => w[key] === mine[key])).length;
   return percent(same, wishes.size);
 }
@@ -172,47 +234,46 @@ function paintVotes(room: RoomSnapshot): void {
     }
     paintVoteBody(box, body);
   }
-  paintPackVote(room, host, wishes, mine);
+  for (const axis of AXES) paintAxisVote(axis, room, host, wishes, mine);
 }
 
-/** The map pack: a choice instead of On/Off. Open, every pack shows its share of the wishes; locked, only the host picks. */
-function paintPackVote(room: RoomSnapshot, host: boolean, wishes: Map<string, EffectiveFlags>, mine: EffectiveFlags | null): void {
-  const box = voteBox('pack');
-  const packs = state.config?.packs ?? [];
-  const locked = room.settings.locked.pack;
-  const votes = room.votes.pack;
+/** An axis: a choice instead of On/Off. Open, every chip shows its share of the wishes; locked, only the host picks. */
+function paintAxisVote(axis: Axis, room: RoomSnapshot, host: boolean, wishes: Map<string, EffectiveFlags>, mine: EffectiveFlags | null): void {
+  const box = voteBox(axis.key);
+  const locked = room.settings.locked[axis.key];
+  const votes: Partial<Record<string, string[]>> = room.votes[axis.key];
   const total = wishes.size;
-  const chosen = room.settings.pack;
+  const chosen = room.settings[axis.key];
   const distinct = Object.keys(votes).length;
 
-  box.classList.toggle('on', locked && chosen !== DEFAULT_PACK);
+  box.classList.toggle('on', locked && chosen !== axis.fallback);
   box.classList.toggle('locked', locked);
   const result = box.querySelector<HTMLElement>('.vote-result')!;
   result.classList.toggle('share', !locked);
-  result.innerHTML = locked ? LOCK_ICON + escapeHtml(packName(chosen)) : total ? t('vote.packs', { n: distinct }) : '–';
-  result.title = locked ? t('vote.lockedByHost') : t('vote.packsTitle');
-  $('pack-hint').textContent = packHint(locked ? chosen : mine?.pack ?? DEFAULT_PACK);
+  result.innerHTML = locked ? LOCK_ICON + escapeHtml(axis.name(chosen)) : total ? t('vote.choices', { n: distinct }) : '–';
+  result.title = locked ? t('vote.lockedByHost') : t('vote.choicesTitle');
+  $(axis.hintEl).textContent = axis.hint(locked ? chosen : mine?.[axis.key] ?? axis.fallback);
 
   let body: string;
   if (locked && !host) {
     body = `<span class="vote-state">${t('vote.lockedByHost')}</span>`;
   } else {
     const attr = locked ? 'data-set' : 'data-vote';
-    const chips = packs.map((id) => {
+    const chips = axis.ids().map((id) => {
       const count = votes[id]?.length ?? 0;
-      const pressed = locked ? id === chosen : mine?.pack === id;
+      const pressed = locked ? id === chosen : mine?.[axis.key] === id;
       const share = !locked && count ? ` <b>${percent(count, total)}</b>` : '';
-      const who = !locked && count ? ` data-who="pack:${id}"` : '';
-      return `<button type="button" ${attr}="pack" data-value="${id}" aria-pressed="${pressed}"${who}>${escapeHtml(packName(id))}${share}</button>`;
+      const who = !locked && count ? ` data-who="${axis.key}:${id}"` : '';
+      return `<button type="button" ${attr}="${axis.key}" data-value="${id}" aria-pressed="${pressed}"${who}>${escapeHtml(axis.name(id))}${share}</button>`;
     }).join('');
     const explain = locked ? t('vote.lockedByYou')
       : !total ? t('vote.noWishesStart')
         : `${t('vote.drawExplain', { n: total })} ${mine ? t('vote.yourChance', { pct: myChance(room, wishes, mine) }) : t('vote.setToCount')}`;
-    body = `<div class="seg pack-seg" role="group" aria-label="${escapeHtml(locked ? t('vote.lockPackAria') : t('vote.yourChoice'))}">${chips}</div>
+    body = `<div class="seg pack-seg" role="group" aria-label="${escapeHtml(locked ? t('vote.lockChoiceAria', { axis: axis.label() }) : t('vote.yourChoice'))}">${chips}</div>
       <span class="vote-state">${explain}</span>
       ${host ? (locked
-        ? `<button type="button" class="vote-link" data-unlock="pack">${t('vote.letVote')}</button>`
-        : `<button type="button" class="vote-link" data-lock="pack">${t('vote.lock')}</button>`) : ''}`;
+        ? `<button type="button" class="vote-link" data-unlock="${axis.key}">${t('vote.letVote')}</button>`
+        : `<button type="button" class="vote-link" data-lock="${axis.key}">${t('vote.lock')}</button>`) : ''}`;
   }
   paintVoteBody(box, body);
 }
@@ -235,10 +296,12 @@ function popContent(key: string): string {
   const list = (ids: string[]): string => (ids.length
     ? `<ul>${ids.map((id) => players.get(id)).filter((p) => !!p).map((p) => `<li><i class="dot" style="background:${p.color}"></i>${escapeHtml(p.name)}</li>`).join('')}</ul>`
     : `<ul><li class="none">${t('vote.nobodyYet')}</li></ul>`);
-  if (key.startsWith('pack:')) {
-    const id = key.slice(5);
-    if (!isPackId(id)) return '';
-    return `<div><h4>${escapeHtml(t('vote.whoPack', { pack: packName(id) }))}</h4>${list(room.votes.pack[id] ?? [])}</div>`;
+  const [axisKey, choice] = key.split(':');
+  const axis = choice !== undefined ? axisOf(axisKey ?? '') : undefined;
+  if (axis) {
+    if (!axis.isId(choice)) return '';
+    const votes: Partial<Record<string, string[]>> = room.votes[axis.key];
+    return `<div><h4>${escapeHtml(t('vote.whoChoice', { choice: axis.name(choice) }))}</h4>${list(votes[choice] ?? [])}</div>`;
   }
   const flag = key as VoteFlag;
   const name = flagName(flag);
@@ -509,23 +572,32 @@ export function initLobby(opts: { leaveToHome: () => void; toggleReady: () => vo
     const pressed = btn.getAttribute('aria-pressed') === 'true';
     const value = btn.dataset.value ?? '';
 
+    const voteAxis = axisOf(btn.dataset.vote ?? '');
+    const setAxis = axisOf(btn.dataset.set ?? '');
+    const lockAxis = axisOf(btn.dataset.lock ?? '');
+
     if (btn.classList.contains('who-btn')) {
       // Touch has no hover: a tap opens the names, a second one closes them.
       if (popAnchor !== btn) openPop(btn);
       else if (lastPointer !== 'mouse') closePop();
-    } else if (btn.dataset.vote === 'pack') {
-      if (!pressed && isPackId(value)) send({ t: 'vote', flag: 'pack', value });
+    } else if (voteAxis) {
+      if (!pressed && voteAxis.isId(value)) {
+        if (voteAxis.key === 'region' && isRegionId(value)) send({ t: 'vote', flag: 'region', value });
+        else if (voteAxis.key === 'scenery' && isSceneryId(value)) send({ t: 'vote', flag: 'scenery', value });
+      }
     } else if (btn.dataset.vote) {
       // A wish is always whole - pressing your own choice again changes nothing.
       if (!pressed) send({ t: 'vote', flag: btn.dataset.vote as VoteFlag, value: value === 'yes' });
-    } else if (btn.dataset.set === 'pack') {
-      if (isPackId(value)) lockFlag('pack', value);
+    } else if (setAxis) {
+      if (setAxis.isId(value)) lockFlag(setAxis.key, value);
     } else if (btn.dataset.set) {
       lockFlag(btn.dataset.set as VoteFlag, value === 'on');
-    } else if (btn.dataset.lock === 'pack') {
+    } else if (lockAxis) {
       // Locking takes over what most players wish for.
-      const top = (Object.entries(votes?.pack ?? {}) as [PackId, string[]][]).sort((a, b) => b[1].length - a[1].length)[0]?.[0];
-      lockFlag('pack', top ?? state.room?.settings.pack ?? DEFAULT_PACK);
+      const tally: Partial<Record<string, string[]>> = votes?.[lockAxis.key] ?? {};
+      const top = Object.entries(tally).sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0))[0]?.[0];
+      const current = state.room?.settings[lockAxis.key];
+      lockFlag(lockAxis.key, (lockAxis.isId(top) ? top : current) ?? lockAxis.fallback);
     } else if (btn.dataset.lock) {
       const flag = btn.dataset.lock as VoteFlag;
       lockFlag(flag, !!votes && votes[flag].yes.length > votes[flag].no.length);
@@ -565,7 +637,8 @@ export function initLobby(opts: { leaveToHome: () => void; toggleReady: () => vo
   });
 
   $('btn-nmpz').addEventListener('click', () => {
-    pushSettings({ noMove: true, noPan: true, noZoom: true, locked: { noMove: true, noPan: true, noZoom: true, pack: collectSettings().locked.pack } });
+    const { locked } = collectSettings();
+    pushSettings({ noMove: true, noPan: true, noZoom: true, locked: { ...locked, noMove: true, noPan: true, noZoom: true } });
   });
 
   $('btn-start').addEventListener('click', () => {

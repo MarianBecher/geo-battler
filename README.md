@@ -35,9 +35,11 @@ hundred games a month (see [What it costs](#what-it-costs)).
 * **Lobby with a code** - whoever has the four-letter code is in; the host
   shares a ready-made link with the code in it
 * **The lobby decides** - the host sets rounds and time limit; everyone
-  wishes for No Move / No Pan / No Zoom and a map (World, Europe, DACH,
-  Americas, Asia, Africa, Oceania), and one wish is drawn at the start; the
-  host can lock any of it
+  wishes for No Move / No Pan / No Zoom, a region (World, Europe, DACH,
+  Americas, Asia, Africa, Oceania) and a scenery (Anything, Big city, Town,
+  Countryside); the two combine freely, so "big city in DACH" is a wish like
+  any other, and one whole wish is drawn at the start; the host can lock any
+  of it
 * **Classic, Duel, Team duel** - points over fixed rounds, or hit points
   until one player or one team is left standing
 * **Everyone sees the same panorama** and starts on the same 3-2-1 countdown
