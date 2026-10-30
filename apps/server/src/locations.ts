@@ -17,6 +17,13 @@ const SEARCH_RADIUS_M = 20000;
 /** Pause after a failed attempt - gives a short outage time to pass. */
 const RETRY_PAUSE_MS = 400;
 
+/**
+ * This many *consecutive* errors mean a real outage, not a blip - surface the
+ * error instead of holding the loading screen for the whole try budget (each
+ * failed probe can take its full 8 s timeout).
+ */
+const MAX_CONSECUTIVE_ERRORS = 5;
+
 /** An area tag assigns a box to map packs; 'de', 'at', 'ch' are separate so there can be a DACH pack. */
 type Area = 'eu' | 'de' | 'at' | 'ch' | 'na' | 'sa' | 'as' | 'af' | 'oc';
 
@@ -254,9 +261,11 @@ export interface SearchOptions {
  */
 export async function pickLocation(apiKey: string, { maxTries = 60, requireMove = false, pack = DEFAULT_PACK }: SearchOptions = {}): Promise<Located> {
   let lastError: Error | null = null;
+  let consecutiveErrors = 0;
   for (let i = 0; i < maxTries; i++) {
     try {
       const hit = await probe(randomPoint(pack), apiKey);
+      consecutiveErrors = 0;
       if (!hit) continue;
       if (requireMove) {
         if (!isOfficialCoverage(hit.copyright)) continue;
@@ -267,9 +276,11 @@ export async function pickLocation(apiKey: string, { maxTries = 60, requireMove 
     } catch (err) {
       lastError = err as Error;
       // Configuration errors repeat anyway - give up immediately.
-      if (/REQUEST_DENIED|error_message|API_KEY/i.test(lastError.message)) throw lastError;
+      if (/REQUEST_DENIED|API_KEY/i.test(lastError.message)) throw lastError;
       // Everything else (UNKNOWN_ERROR, timeout) is usually transient. Take a
-      // breath, otherwise one outage burns through all attempts in seconds.
+      // breath, otherwise one outage burns through all attempts in seconds -
+      // but a whole row of failures is an outage, not a blip.
+      if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) throw lastError;
       await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
     }
   }
