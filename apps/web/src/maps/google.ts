@@ -153,6 +153,9 @@ const PASSPORT_MAP_STYLE: google.maps.MapTypeStyle[] = [
   { elementType: 'labels.text.fill', stylers: [{ color: '#1f2d4d' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#eef3ed' }, { weight: 3 }] },
   { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  // Zoomed out, a city is its dot plus its name: without the dot Google drops
+  // the name too, and the cities only turn up once the dots are gone anyway.
+  { featureType: 'administrative.locality', elementType: 'labels.icon', stylers: [{ visibility: 'on' }] },
   { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#6f7f99' }, { weight: 0.7 }] },
   { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#1f2d4d' }] },
   { featureType: 'administrative.province', elementType: 'geometry.stroke', stylers: [{ color: '#8f9cb0' }, { weight: 0.5 }] },
